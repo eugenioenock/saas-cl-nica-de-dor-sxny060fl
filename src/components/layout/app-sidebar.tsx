@@ -23,13 +23,13 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/' },
-  { title: 'Patients', icon: Users, url: '/patients' },
-  { title: 'Medical Records', icon: Activity, url: '/records' },
-  { title: 'Inventory', icon: Package, url: '/inventory' },
-  { title: 'Financial', icon: DollarSign, url: '/financial' },
+  { title: 'Pacientes', icon: Users, url: '/pacientes' },
+  { title: 'Prontuários', icon: Activity, url: '/records' },
+  { title: 'Estoque', icon: Package, url: '/inventory' },
+  { title: 'Financeiro', icon: DollarSign, url: '/financial' },
 ]
 
-const settingsItems = [{ title: 'Clinic Settings', icon: Settings, url: '/settings' }]
+const settingsItems = [{ title: 'Configurações', icon: Settings, url: '/settings' }]
 
 export function AppSidebar() {
   const location = useLocation()

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppContext } from '@/hooks/use-app-context'
 import { mockPatients } from '@/lib/data'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/table'
 import { Search, Plus, FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Badge } from '@/components/ui/badge'
 
 export default function Patients() {
   const { activeClinic } = useAppContext()
@@ -26,15 +25,26 @@ export default function Patients() {
       (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.document.includes(searchTerm)),
   )
 
+  const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
-          <p className="text-muted-foreground">Manage your clinic's patient registry.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Pacientes</h1>
+          <p className="text-muted-foreground">Gerencie o registro de pacientes da clínica.</p>
         </div>
         <Button className="shrink-0">
-          <Plus className="mr-2 h-4 w-4" /> New Patient
+          <Plus className="mr-2 h-4 w-4" /> Novo Paciente
         </Button>
       </div>
 
@@ -44,7 +54,7 @@ export default function Patients() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search by name or document..."
+              placeholder="Buscar por nome ou CPF..."
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -55,11 +65,11 @@ export default function Patients() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="px-6">Name</TableHead>
-                <TableHead>Document (CPF)</TableHead>
-                <TableHead>Date of Birth</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
+                <TableHead className="px-6">Nome</TableHead>
+                <TableHead>Documento (CPF)</TableHead>
+                <TableHead>Idade / Data de Nasc.</TableHead>
+                <TableHead>Contato</TableHead>
+                <TableHead className="text-right px-6">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -68,17 +78,18 @@ export default function Patients() {
                   <TableRow key={patient.id}>
                     <TableCell className="px-6 font-medium">{patient.name}</TableCell>
                     <TableCell>{patient.document}</TableCell>
-                    <TableCell>{new Date(patient.dob).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-normal">
-                        {patient.gender}
-                      </Badge>
+                      {calculateAge(patient.dob)} anos (
+                      {new Date(patient.dob).toLocaleDateString('pt-BR')})
+                    </TableCell>
+                    <TableCell>
+                      {(patient as any).phone || (patient as any).email || '(11) 99999-9999'}
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/patients/${patient.id}/record`}>
+                        <Link to={`/pacientes/${patient.id}/record`}>
                           <FileText className="mr-2 h-4 w-4 text-primary" />
-                          Record
+                          Ver Prontuário
                         </Link>
                       </Button>
                     </TableCell>
@@ -87,7 +98,7 @@ export default function Patients() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No patients found.
+                    Nenhum paciente encontrado.
                   </TableCell>
                 </TableRow>
               )}
