@@ -77,9 +77,11 @@ export default function PatientRecord() {
   const save = async () => {
     try {
       const payload = { ...form, patient_id: id }
-      form.id
-        ? await pb.collection('pain_points').update(form.id, payload)
-        : await pb.collection('pain_points').create(payload)
+      if (form.id) {
+        await pb.collection('pain_points').update(form.id, payload)
+      } else {
+        await pb.collection('pain_points').create(payload)
+      }
       setIsOpen(false)
       toast.success('Salvo com sucesso!')
     } catch (e) {
