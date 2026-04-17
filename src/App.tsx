@@ -39,7 +39,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Index />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/:id" element={<PatientRecord />} />
               <Route path="/records" element={<RecordsRedirect />} />

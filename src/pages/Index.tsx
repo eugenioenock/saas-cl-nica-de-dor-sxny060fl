@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { Link } from 'react-router-dom'
 
 export default function Index() {
   const [totalPatients, setTotalPatients] = useState(0)
@@ -139,12 +140,13 @@ export default function Index() {
                   </p>
                 ) : (
                   criticalPatients.map((pt) => (
-                    <div
+                    <Link
                       key={pt.id}
-                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                      to={`/pacientes/${pt.patient_id}`}
+                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0 hover:bg-muted/50 p-2 rounded-md transition-colors -mx-2"
                     >
                       <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
+                        <p className="text-sm font-medium leading-none text-primary hover:underline">
                           {pt.expand?.patient_id?.name || 'Paciente Desconhecido'}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -155,7 +157,7 @@ export default function Index() {
                       <Badge variant="destructive" className="ml-auto">
                         Intensidade {pt.intensity}
                       </Badge>
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>

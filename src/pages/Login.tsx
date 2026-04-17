@@ -14,7 +14,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (loading) return null
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/dashboard" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

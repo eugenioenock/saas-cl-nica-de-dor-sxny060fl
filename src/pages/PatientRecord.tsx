@@ -34,6 +34,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 export default function PatientRecord() {
   const { id } = useParams()
   const [data, setData] = useState<any>({ patient: null, points: [], notes: [], catalog: [] })
+  const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [view, setView] = useState<'front' | 'back'>('front')
@@ -51,7 +52,7 @@ export default function PatientRecord() {
   const load = async () => {
     if (!id) return
     try {
-      const [patient, points, notes, catalog] = await Promise.all([
+      const [patient, points, notes, catalog, settingsRes] = await Promise.all([
         pb.collection('patients').getOne(id!),
         pb
           .collection('pain_points')
@@ -60,8 +61,15 @@ export default function PatientRecord() {
           .collection('medical_notes')
           .getFullList({ filter: `patient_id="${id}"`, sort: '-created' }),
         pb.collection('pathologies_catalog').getFullList({ sort: 'name' }),
+        pb
+          .collection('clinic_settings')
+          .getList(1, 1)
+          .catch(() => null),
       ])
       setData({ patient, points, notes, catalog: catalog.map((c) => c.name) })
+      if (settingsRes && settingsRes.items.length > 0) {
+        setClinicSettings(settingsRes.items[0])
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -417,13 +425,35 @@ export default function PatientRecord() {
 
       {/* Print Only Section */}
       <div className="hidden print:block w-full bg-white text-black text-sm">
-        <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-6">
-          <div className="flex items-center gap-2">
-            <Activity className="h-8 w-8" />
-            <span className="text-2xl font-bold">SpineCare Solutions</span>
+        <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
+          <div className="flex items-center gap-4">
+            {clinicSettings?.logo ? (
+              <img
+                src={pb.files.getURL(clinicSettings, clinicSettings.logo)}
+                alt="Clinic Logo"
+                className="h-16 w-16 object-contain"
+              />
+            ) : (
+              <Activity className="h-12 w-12 text-black" />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold">
+                {clinicSettings?.name || 'SpineCare Solutions'}
+              </h1>
+              {(clinicSettings?.address || clinicSettings?.phone || clinicSettings?.email) && (
+                <div className="text-sm text-gray-600 mt-1">
+                  {clinicSettings.address && <div>{clinicSettings.address}</div>}
+                  <div className="flex gap-4">
+                    {clinicSettings.phone && <span>📞 {clinicSettings.phone}</span>}
+                    {clinicSettings.email && <span>✉️ {clinicSettings.email}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="text-right text-gray-600">
-            Prontuário gerado em: {new Date().toLocaleDateString()}
+          <div className="text-right text-gray-600 flex flex-col justify-end">
+            <span className="font-semibold text-black uppercase mb-1">Resumo Clínico</span>
+            <span>Gerado em: {new Date().toLocaleDateString()}</span>
           </div>
         </div>
 
