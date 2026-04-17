@@ -8,27 +8,39 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
 import { Trash2, MapPin, MousePointerClick, Loader2 } from 'lucide-react'
-import { getPainPoints, savePainPoint, deletePainPoint, PainPoint } from '@/lib/db'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 type MapView = 'front' | 'back'
 
 export function BodyMap({ patientId, gender }: { patientId: string; gender?: string }) {
   const [view, setView] = useState<MapView>('front')
-  const [points, setPoints] = useState<PainPoint[]>([])
+  const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const mapRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const loadPoints = async () => {
-      setLoading(true)
-      const data = await getPainPoints(patientId)
+  const loadPoints = async () => {
+    try {
+      const data = await pb
+        .collection('pain_points')
+        .getFullList({ filter: `patient_id="${patientId}"` })
       setPoints(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
     loadPoints()
   }, [patientId])
+
+  useRealtime('pain_points', () => {
+    loadPoints()
+  })
 
   const genderStr = gender?.toLowerCase() || ''
   const isFemale = genderStr === 'female' || genderStr === 'feminino'
@@ -43,9 +55,8 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
 
-    const newPoint: PainPoint = {
-      id: Math.random().toString(36).substring(7),
-      patientId,
+    const newPoint = {
+      patient_id: patientId,
       x,
       y,
       view,
@@ -54,24 +65,38 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
       intensity: 5,
     }
 
-    setPoints([...points, newPoint])
-    await savePainPoint(newPoint)
+    try {
+      await pb.collection('pain_points').create(newPoint)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
-  const updatePoint = (id: string, updates: Partial<PainPoint>) => {
+  const updatePoint = (id: string, updates: any) => {
     setPoints(points.map((p) => (p.id === id ? { ...p, ...updates } : p)))
   }
 
   const saveUpdatedPoint = async (id: string) => {
     const pt = points.find((p) => p.id === id)
     if (pt) {
-      await savePainPoint(pt)
+      try {
+        await pb.collection('pain_points').update(id, {
+          name: pt.name,
+          notes: pt.notes,
+          intensity: pt.intensity,
+        })
+      } catch (e) {
+        console.error(e)
+      }
     }
   }
 
   const handleDeletePoint = async (id: string) => {
-    setPoints(points.filter((p) => p.id !== id))
-    await deletePainPoint(id)
+    try {
+      await pb.collection('pain_points').delete(id)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const visiblePoints = points.filter((p) => p.view === view)

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useAppContext } from '@/hooks/use-app-context'
-import { mockUsers, Appointment, Patient } from '@/lib/data'
-import { getPatient, getProcedures, saveProcedure } from '@/lib/db'
+import { mockUsers } from '@/lib/data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Activity } from 'lucide-react'
@@ -32,46 +32,63 @@ const calculateAge = (dob: string) => {
 }
 
 export default function PatientRecord() {
-  const { activeClinic } = useAppContext()
   const { id } = useParams()
 
-  const [patient, setPatient] = useState<Patient | null>(null)
-  const [localProcedures, setLocalProcedures] = useState<Appointment[]>([])
+  const [patient, setPatient] = useState<any>(null)
+  const [localProcedures, setLocalProcedures] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) return
-      setLoading(true)
-      try {
-        const p = await getPatient(id)
-        if (!p || p.clinicId !== activeClinic.id) {
-          setError(true)
-          return
-        }
-        setPatient(p)
-        const procs = await getProcedures(id)
-        setLocalProcedures(
-          procs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-        )
-      } catch (err) {
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
+  const loadData = async () => {
+    if (!id) return
+    try {
+      const p = await pb.collection('patients').getOne(id)
+      setPatient(p)
+      const procs = await pb.collection('medical_notes').getFullList({
+        filter: `patient_id="${id}"`,
+        sort: '-date,-created',
+      })
+      setLocalProcedures(procs)
+    } catch (err) {
+      setError(true)
+    } finally {
+      setLoading(false)
     }
-    loadData()
-  }, [id, activeClinic.id])
+  }
 
-  const handleAddProcedure = useCallback(async (newProcedure: Appointment) => {
-    await saveProcedure(newProcedure)
-    setLocalProcedures((prev) =>
-      [newProcedure, ...prev].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      ),
-    )
-  }, [])
+  useEffect(() => {
+    loadData()
+  }, [id])
+
+  useRealtime('medical_notes', () => {
+    loadData()
+  })
+
+  useRealtime('patients', () => {
+    if (id) {
+      pb.collection('patients')
+        .getOne(id)
+        .then(setPatient)
+        .catch(() => {})
+    }
+  })
+
+  const handleAddProcedure = useCallback(
+    async (newProcedure: any) => {
+      try {
+        await pb.collection('medical_notes').create({
+          patient_id: id,
+          content: newProcedure.procedure,
+          date: newProcedure.date,
+          professionalId: newProcedure.professionalId,
+          status: newProcedure.status,
+        })
+      } catch (e) {
+        console.error(e)
+      }
+    },
+    [id],
+  )
 
   if (loading) {
     return (
@@ -251,9 +268,9 @@ export default function PatientRecord() {
                         </TableCell>
                         <TableCell
                           className="font-medium max-w-[300px] truncate"
-                          title={proc.procedure}
+                          title={proc.content || proc.procedure}
                         >
-                          {proc.procedure}
+                          {proc.content || proc.procedure}
                         </TableCell>
                         <TableCell>{getProfessionalName(proc.professionalId)}</TableCell>
                         <TableCell className="text-right px-6">

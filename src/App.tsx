@@ -12,27 +12,46 @@ import Financial from './pages/Financial'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import RecordsRedirect from './pages/RecordsRedirect'
+import Login from './pages/Login'
+import { AuthProvider, useAuth } from './hooks/use-auth'
+import { Navigate } from 'react-router-dom'
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-    <AppProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/pacientes" element={<Patients />} />
-            <Route path="/pacientes/:id" element={<PatientRecord />} />
-            <Route path="/records" element={<RecordsRedirect />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/financial" element={<Financial />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/" element={<Index />} />
+              <Route path="/pacientes" element={<Patients />} />
+              <Route path="/pacientes/:id" element={<PatientRecord />} />
+              <Route path="/records" element={<RecordsRedirect />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/financial" element={<Financial />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </AppProvider>
+    </AuthProvider>
   </BrowserRouter>
 )
 

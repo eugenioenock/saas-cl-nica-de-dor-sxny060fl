@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '@/hooks/use-app-context'
-import { mockPatients, Patient } from '@/lib/data'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -30,15 +29,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Search, Plus, FileText } from 'lucide-react'
+import { Search, Plus, FileText, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
+import { extractFieldErrors } from '@/lib/pocketbase/errors'
 
 export default function Patients() {
   const { activeClinic } = useAppContext()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
-  const [localPatients, setLocalPatients] = useState<Patient[]>(mockPatients)
+  const [localPatients, setLocalPatients] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     document: '',
@@ -48,10 +53,30 @@ export default function Patients() {
     gender: '',
   })
 
+  const loadData = async () => {
+    try {
+      const records = await pb.collection('patients').getFullList({ sort: '-created' })
+      setLocalPatients(records)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  useRealtime('patients', () => {
+    loadData()
+  })
+
   const patients = localPatients.filter(
     (p) =>
-      p.clinicId === activeClinic.id &&
-      (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.document.includes(searchTerm)),
+      (!p.clinicId || p.clinicId === activeClinic.id) &&
+      (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.document?.includes(searchTerm)),
   )
 
   const calculateAge = (dob: string) => {
@@ -66,28 +91,29 @@ export default function Patients() {
     return age
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.document) return
+    setIsSubmitting(true)
+    setFieldErrors({})
 
-    const newPatient: Patient = {
-      id: `p${Date.now()}`,
-      clinicId: activeClinic.id,
-      name: formData.name,
-      document: formData.document,
-      dob: formData.dob || new Date().toISOString().split('T')[0],
-      gender: formData.gender || 'Other',
-      email: formData.email,
-      phone: formData.phone,
+    try {
+      const payload = {
+        ...formData,
+        dob: formData.dob ? new Date(formData.dob).toISOString().replace('T', ' ') : '',
+        clinicId: activeClinic.id,
+      }
+      await pb.collection('patients').create(payload)
+      setIsOpen(false)
+      setFormData({ name: '', document: '', dob: '', email: '', phone: '', gender: '' })
+      toast({
+        title: 'Paciente cadastrado',
+        description: 'O paciente foi adicionado com sucesso no banco de dados.',
+      })
+    } catch (err) {
+      setFieldErrors(extractFieldErrors(err))
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setLocalPatients([newPatient, ...localPatients])
-    setIsOpen(false)
-    setFormData({ name: '', document: '', dob: '', email: '', phone: '', gender: '' })
-    toast({
-      title: 'Paciente cadastrado',
-      description: 'O paciente foi adicionado com sucesso (apenas sessão local).',
-    })
   }
 
   return (
@@ -107,9 +133,7 @@ export default function Patients() {
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Novo Paciente</DialogTitle>
-              <DialogDescription>
-                Insira os dados do novo paciente. Cadastro válido apenas para esta sessão (mock).
-              </DialogDescription>
+              <DialogDescription>Insira os dados do novo paciente.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSave} className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -120,16 +144,21 @@ export default function Patients() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
+                {fieldErrors.name && (
+                  <span className="text-xs text-destructive">{fieldErrors.name}</span>
+                )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="document">Documento (CPF) *</Label>
+                <Label htmlFor="document">Documento (CPF)</Label>
                 <Input
                   id="document"
                   placeholder="000.000.000-00"
-                  required
                   value={formData.document}
                   onChange={(e) => setFormData({ ...formData, document: e.target.value })}
                 />
+                {fieldErrors.document && (
+                  <span className="text-xs text-destructive">{fieldErrors.document}</span>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -178,7 +207,10 @@ export default function Patients() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit">Salvar Paciente</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Salvar Paciente
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -210,7 +242,13 @@ export default function Patients() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {patients.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                  </TableCell>
+                </TableRow>
+              ) : patients.length > 0 ? (
                 patients.map((patient) => (
                   <TableRow key={patient.id}>
                     <TableCell className="px-6 font-medium">{patient.name}</TableCell>
