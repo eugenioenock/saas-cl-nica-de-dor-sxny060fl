@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
+  CalendarDays,
   Users,
   Activity,
   Package,
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/' },
+  { title: 'Agenda', icon: CalendarDays, url: '/agenda' },
   { title: 'Pacientes', icon: Users, url: '/pacientes' },
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },

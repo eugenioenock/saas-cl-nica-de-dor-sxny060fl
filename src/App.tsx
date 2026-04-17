@@ -13,6 +13,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import RecordsRedirect from './pages/RecordsRedirect'
+import Agenda from './pages/Agenda'
 import Login from './pages/Login'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
@@ -43,6 +44,7 @@ const App = () => (
             >
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Index />} />
+              <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/:id" element={<PatientRecord />} />
               <Route path="/records" element={<RecordsRedirect />} />
