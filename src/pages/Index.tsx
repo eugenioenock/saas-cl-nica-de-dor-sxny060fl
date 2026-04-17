@@ -1,126 +1,238 @@
-import { useAppContext } from '@/hooks/use-app-context'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Calendar, Activity, TrendingUp } from 'lucide-react'
-import { mockAppointments, mockPatients, mockFinancials } from '@/lib/data'
+import { Users, Calendar, Activity, AlertTriangle, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Index() {
-  const { activeClinic } = useAppContext()
+  const [totalPatients, setTotalPatients] = useState(0)
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([])
+  const [criticalPatients, setCriticalPatients] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const clinicPatients = mockPatients.filter((p) => p.clinicId === activeClinic.id)
-  const upcomingAppointments = mockAppointments
-    .filter((a) => a.clinicId === activeClinic.id && a.status === 'scheduled')
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const loadData = async () => {
+    try {
+      const patientsRes = await pb.collection('patients').getList(1, 1)
+      setTotalPatients(patientsRes.totalItems)
 
-  const totalIncome = mockFinancials
-    .filter((f) => f.clinicId === activeClinic.id && f.type === 'income')
-    .reduce((acc, curr) => acc + curr.amount, 0)
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      const end = new Date()
+      end.setHours(23, 59, 59, 999)
+
+      const notes = await pb.collection('medical_notes').getFullList({
+        filter: `date >= "${start.toISOString().replace('T', ' ')}" && date <= "${end.toISOString().replace('T', ' ')}"`,
+        expand: 'patient_id',
+        sort: 'date',
+      })
+      setTodayAppointments(notes)
+
+      const critical = await pb.collection('pain_points').getList(1, 50, {
+        filter: 'intensity >= 8',
+        sort: '-created',
+        expand: 'patient_id',
+      })
+
+      const seen = new Set()
+      const dedupedCritical = []
+      for (const pt of critical.items) {
+        if (!seen.has(pt.patient_id)) {
+          seen.add(pt.patient_id)
+          dedupedCritical.push(pt)
+        }
+      }
+      setCriticalPatients(dedupedCritical)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  useRealtime('patients', loadData)
+  useRealtime('medical_notes', loadData)
+  useRealtime('pain_points', loadData)
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back. Here's an overview of {activeClinic.name}.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
+        <p className="text-muted-foreground">Resumo diário e alertas críticos.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{clinicPatients.length}</div>
-            <p className="text-xs text-muted-foreground">+2 from last month</p>
+            {loading ? (
+              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-2xl font-bold">{totalPatients}</div>
+            )}
+            <p className="text-xs text-muted-foreground">Pacientes registrados</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Appointments Today</CardTitle>
+            <CardTitle className="text-sm font-medium">Agendamentos Hoje</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingAppointments.length}</div>
-            <p className="text-xs text-muted-foreground">2 pending records</p>
+            {loading ? (
+              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-2xl font-bold">{todayAppointments.length}</div>
+            )}
+            <p className="text-xs text-muted-foreground">Consultas marcadas para hoje</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Procedures</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Alertas Críticos</CardTitle>
+            <Activity className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">+19% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue (MTD)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalIncome.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+4% from last month</p>
+            {loading ? (
+              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-2xl font-bold text-destructive">{criticalPatients.length}</div>
+            )}
+            <p className="text-xs text-muted-foreground">Pacientes com dor ≥ 8</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+        <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest updates from your clinic.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Pacientes em Estado Crítico
+            </CardTitle>
+            <CardDescription>Último registro de dor com intensidade ≥ 8.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3].map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                    <Activity className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">Medical Record Updated</p>
-                    <p className="text-xs text-muted-foreground">
-                      Dr. Sarah Jenkins added a note to Patient {mockPatients[0].name}
-                    </p>
-                  </div>
-                  <div className="text-xs text-muted-foreground">2h ago</div>
-                </div>
-              ))}
-            </div>
+            <ScrollArea className="h-[300px] pr-4">
+              <div className="space-y-4">
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex justify-between items-center py-2">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                        <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="h-6 w-16 bg-muted animate-pulse rounded-full" />
+                    </div>
+                  ))
+                ) : criticalPatients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum alerta crítico no momento.
+                  </p>
+                ) : (
+                  criticalPatients.map((pt) => (
+                    <div
+                      key={pt.id}
+                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {pt.expand?.patient_id?.name || 'Paciente Desconhecido'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(pt.created).toLocaleDateString()} -{' '}
+                          {pt.name || 'Ponto sem nome'}
+                        </p>
+                      </div>
+                      <Badge variant="destructive" className="ml-auto">
+                        Intensidade {pt.intensity}
+                      </Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+
+        <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Upcoming Appointments</CardTitle>
-            <CardDescription>Next scheduled visits.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              Agenda do Dia
+            </CardTitle>
+            <CardDescription>Consultas e procedimentos para hoje.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {upcomingAppointments.map((apt) => {
-                const patient = mockPatients.find((p) => p.id === apt.patientId)
-                return (
-                  <div key={apt.id} className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium leading-none">{patient?.name}</p>
-                      <p className="text-xs text-muted-foreground">{apt.procedure}</p>
+            <ScrollArea className="h-[300px] pr-4">
+              <div className="space-y-4">
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex justify-between items-center py-2">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                        <div className="h-3 w-48 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="h-6 w-20 bg-muted animate-pulse rounded-full" />
                     </div>
-                    <Badge variant="outline">{new Date(apt.date).toLocaleDateString()}</Badge>
-                  </div>
-                )
-              })}
-              {upcomingAppointments.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No upcoming appointments
-                </p>
-              )}
-            </div>
+                  ))
+                ) : todayAppointments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma consulta para hoje.
+                  </p>
+                ) : (
+                  todayAppointments.map((apt) => (
+                    <div
+                      key={apt.id}
+                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {apt.expand?.patient_id?.name || 'Paciente Desconhecido'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {apt.content
+                            ? apt.content.substring(0, 50) + (apt.content.length > 50 ? '...' : '')
+                            : 'Sem descrição'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-xs font-semibold">
+                          {new Date(apt.date).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            apt.status === 'completed'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : apt.status === 'cancelled'
+                                ? 'bg-red-100 text-red-800 border-red-200'
+                                : ''
+                          }
+                        >
+                          {apt.status === 'completed'
+                            ? 'Concluído'
+                            : apt.status === 'cancelled'
+                              ? 'Cancelado'
+                              : 'Agendado'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
