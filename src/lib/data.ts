@@ -27,6 +27,7 @@ export type Appointment = {
   date: string
   status: 'scheduled' | 'completed' | 'cancelled'
   procedure: string
+  professionalId?: string
 }
 
 export const mockFranchises: Franchise[] = [{ id: 'f1', name: 'SpineCare National' }]
@@ -153,7 +154,8 @@ export const mockAppointments: Appointment[] = [
     patientId: 'p1',
     date: new Date(Date.now() + 86400000).toISOString(),
     status: 'scheduled',
-    procedure: 'Follow-up',
+    procedure: 'Acompanhamento',
+    professionalId: 'u1',
   },
   {
     id: 'apt2',
@@ -161,7 +163,8 @@ export const mockAppointments: Appointment[] = [
     patientId: 'p2',
     date: new Date(Date.now() + 172800000).toISOString(),
     status: 'scheduled',
-    procedure: 'Lumbar Block',
+    procedure: 'Bloqueio Lombar',
+    professionalId: 'u1',
   },
   {
     id: 'apt3',
@@ -169,6 +172,25 @@ export const mockAppointments: Appointment[] = [
     patientId: 'p3',
     date: new Date(Date.now() - 86400000).toISOString(),
     status: 'completed',
-    procedure: 'Consultation',
+    procedure: 'Consulta',
+    professionalId: 'u1',
+  },
+  {
+    id: 'apt4',
+    clinicId: 'c1',
+    patientId: 'p1',
+    date: new Date(Date.now() - 172800000).toISOString(),
+    status: 'completed',
+    procedure: 'Bloqueio de Nervo',
+    professionalId: 'u1',
+  },
+  {
+    id: 'apt5',
+    clinicId: 'c1',
+    patientId: 'p1',
+    date: new Date(Date.now() - 864000000).toISOString(),
+    status: 'completed',
+    procedure: 'Infiltração',
+    professionalId: 'u1',
   },
 ]

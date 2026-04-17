@@ -1,94 +1,212 @@
 import { useParams, Link } from 'react-router-dom'
-import { mockPatients } from '@/lib/data'
+import { useAppContext } from '@/hooks/use-app-context'
+import { mockPatients, mockAppointments, mockUsers } from '@/lib/data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, History, FileText } from 'lucide-react'
+import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Activity } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { BodyMap } from '@/components/medical/body-map'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+const calculateAge = (dob: string) => {
+  const birthDate = new Date(dob)
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const m = today.getMonth() - birthDate.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age
+}
 
 export default function PatientRecord() {
+  const { activeClinic } = useAppContext()
   const { id } = useParams()
-  const patient = mockPatients.find((p) => p.id === id)
+
+  const patient = mockPatients.find((p) => p.id === id && p.clinicId === activeClinic.id)
 
   if (!patient) {
-    return <div className="p-6">Patient not found</div>
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-[50vh] text-center">
+        <h2 className="text-2xl font-bold mb-4">Paciente não encontrado</h2>
+        <p className="text-muted-foreground mb-6">
+          O paciente que você está procurando não existe ou não pertence a esta clínica.
+        </p>
+        <Button asChild>
+          <Link to="/pacientes">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para a lista
+          </Link>
+        </Button>
+      </div>
+    )
+  }
+
+  const patientProcedures = mockAppointments
+    .filter((apt) => apt.patientId === patient.id && apt.clinicId === activeClinic.id)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const getProfessionalName = (profId?: string) => {
+    if (!profId) return 'Não atribuído'
+    const user = mockUsers.find((u) => u.id === profId)
+    return user ? user.name : 'Desconhecido'
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <Badge className="bg-green-500/10 text-green-700 hover:bg-green-500/20 border-green-200">
+            Concluído
+          </Badge>
+        )
+      case 'scheduled':
+        return (
+          <Badge className="bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 border-blue-200">
+            Agendado
+          </Badge>
+        )
+      case 'cancelled':
+        return (
+          <Badge className="bg-red-500/10 text-red-700 hover:bg-red-500/20 border-red-200">
+            Cancelado
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/patients">
-            <ArrowLeft className="h-5 w-5" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <Button variant="outline" asChild className="shrink-0">
+          <Link to="/pacientes">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{patient.name}</h1>
-          <p className="text-muted-foreground">
-            Document: {patient.document} • DOB: {new Date(patient.dob).toLocaleDateString()}
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Prontuário do Paciente</h1>
+          <p className="text-muted-foreground">Visão detalhada e histórico clínico</p>
         </div>
       </div>
 
-      <Tabs defaultValue="map" className="w-full">
+      <Card>
+        <CardHeader className="bg-muted/30 pb-4">
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <User className="h-6 w-6 text-primary" />
+            {patient.name}
+          </CardTitle>
+          <CardDescription>Resumo de informações do paciente</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-4 w-4" /> Idade / Nasc.
+              </p>
+              <p className="font-medium">
+                {calculateAge(patient.dob)} anos (
+                {new Date(patient.dob).toLocaleDateString('pt-BR')})
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Documento (CPF)
+              </p>
+              <p className="font-medium">{patient.document}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Phone className="h-4 w-4" /> Contato
+              </p>
+              <p className="font-medium">{(patient as any).phone || '(11) 99999-9999'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Mail className="h-4 w-4" /> E-mail
+              </p>
+              <p className="font-medium">{(patient as any).email || 'Não informado'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="procedures" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="map">Anatomical Map</TabsTrigger>
-          <TabsTrigger value="history">Procedure History</TabsTrigger>
+          <TabsTrigger value="procedures">Procedimentos</TabsTrigger>
+          <TabsTrigger value="map">Mapa Anatômico</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="procedures" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Procedimentos
+              </CardTitle>
+              <CardDescription>
+                Histórico de todos os procedimentos clínicos associados a este paciente.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="px-6">Data</TableHead>
+                    <TableHead>Procedimento</TableHead>
+                    <TableHead>Profissional Responsável</TableHead>
+                    <TableHead className="text-right px-6">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {patientProcedures.length > 0 ? (
+                    patientProcedures.map((proc) => (
+                      <TableRow key={proc.id}>
+                        <TableCell className="px-6 whitespace-nowrap">
+                          {new Date(proc.date).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="font-medium">{proc.procedure}</TableCell>
+                        <TableCell>{getProfessionalName(proc.professionalId)}</TableCell>
+                        <TableCell className="text-right px-6">
+                          {getStatusBadge(proc.status)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <FileText className="h-8 w-8 text-muted-foreground/30" />
+                          <p>Nenhum procedimento encontrado.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="map" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pain Points & Pathologies</CardTitle>
+              <CardTitle>Pontos de Dor & Patologias</CardTitle>
               <CardDescription>
-                Click on the interactive map to register a new pathology.
+                Mapa interativo com os registros anatômicos do paciente.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <BodyMap patientId={patient.id} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="history" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Clinical History</CardTitle>
-              <CardDescription>Timeline of procedures and consultations.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted before:to-transparent">
-                {/* Mock timeline items */}
-                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-background bg-primary text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border bg-card shadow-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-bold text-foreground">Initial Consultation</h4>
-                      <time className="text-xs font-medium text-primary">Mar 10, 2026</time>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Patient reported severe lower back pain.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-background bg-secondary text-secondary-foreground shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                    <History className="w-4 h-4" />
-                  </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border bg-card shadow-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-bold text-foreground">Lumbar Block Procedure</h4>
-                      <time className="text-xs font-medium text-muted-foreground">
-                        Mar 25, 2026
-                      </time>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Successfully administered at L4-L5.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

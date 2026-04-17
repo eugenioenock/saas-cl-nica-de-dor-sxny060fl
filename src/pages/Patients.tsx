@@ -87,7 +87,7 @@ export default function Patients() {
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/pacientes/${patient.id}/record`}>
+                        <Link to={`/pacientes/${patient.id}`}>
                           <FileText className="mr-2 h-4 w-4 text-primary" />
                           Ver Prontuário
                         </Link>
