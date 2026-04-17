@@ -19,12 +19,16 @@ type Point = {
   notes: string
 }
 
-export function BodyMap({ patientId }: { patientId: string }) {
+export function BodyMap({ patientId, gender }: { patientId: string; gender?: string }) {
   const [view, setView] = useState<MapView>('front')
   const [points, setPoints] = useState<Point[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
 
   const mapRef = useRef<HTMLDivElement>(null)
+
+  const genderStr = gender?.toLowerCase() || ''
+  const isFemale = genderStr === 'female' || genderStr === 'feminino'
+  const isMale = genderStr === 'male' || genderStr === 'masculino'
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapRef.current) return
@@ -78,75 +82,165 @@ export function BodyMap({ patientId }: { patientId: string }) {
           className="flex-1 relative cursor-crosshair flex items-center justify-center p-4"
           onClick={handleMapClick}
         >
-          {/* Simple Body SVG Silhouette */}
           <svg
             viewBox="0 0 200 500"
             className="w-full h-full max-h-[500px] drop-shadow-sm opacity-80 pointer-events-none text-slate-300 dark:text-slate-700"
           >
-            {view === 'front' ? (
+            {isFemale ? (
               <g fill="currentColor">
-                {/* Head */}
+                <ellipse cx="100" cy="40" rx="23" ry="30" />
+                <rect x="88" y="65" width="24" height="20" rx="5" />
+                <path d="M60,80 Q100,70 140,80 Q120,150 145,220 Q100,230 55,220 Q80,150 60,80 Z" />
+                <path d="M60,85 Q25,100 30,210 Q45,215 50,110 Z" />
+                <path d="M140,85 Q175,100 170,210 Q155,215 150,110 Z" />
+                <path d="M55,215 L50,450 Q70,460 85,450 L95,230 Z" />
+                <path d="M145,215 L150,450 Q130,460 115,450 L105,230 Z" />
+                {view === 'front' ? (
+                  <>
+                    <path
+                      d="M70,120 Q85,140 100,120 M100,120 Q115,140 130,120"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M100,135 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <path
+                      d="M100,80 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M70,100 Q85,120 100,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M130,100 Q115,120 100,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                )}
+              </g>
+            ) : isMale ? (
+              <g fill="currentColor">
                 <ellipse cx="100" cy="40" rx="25" ry="32" />
                 <rect x="85" y="65" width="30" height="20" rx="5" />
-                {/* Torso */}
-                <path d="M55,80 Q100,70 145,80 L135,220 Q100,230 65,220 Z" />
-                {/* Arms */}
-                <path d="M55,85 Q20,100 25,210 Q40,215 45,100 Z" />
-                <path d="M145,85 Q180,100 175,210 Q160,215 155,100 Z" />
-                {/* Legs */}
-                <path d="M65,215 L50,450 Q70,460 85,450 L95,230 Z" />
-                <path d="M135,215 L150,450 Q130,460 115,450 L105,230 Z" />
-                {/* Details (Front) */}
-                <path
-                  d="M70,130 Q100,145 130,130"
-                  stroke="var(--background)"
-                  strokeWidth="2"
-                  fill="none"
-                  className="opacity-50"
-                />
-                <path
-                  d="M100,140 L100,210"
-                  stroke="var(--background)"
-                  strokeWidth="2"
-                  fill="none"
-                  className="opacity-50"
-                />
+                <path d="M50,80 Q100,70 150,80 L130,220 Q100,230 70,220 Z" />
+                <path d="M50,85 Q15,100 20,210 Q35,215 45,100 Z" />
+                <path d="M150,85 Q185,100 180,210 Q165,215 155,100 Z" />
+                <path d="M70,215 L50,450 Q70,460 85,450 L95,230 Z" />
+                <path d="M130,215 L150,450 Q130,460 115,450 L105,230 Z" />
+                {view === 'front' ? (
+                  <>
+                    <path
+                      d="M65,125 Q100,140 135,125"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M100,135 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <path
+                      d="M100,80 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M70,100 Q85,120 100,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M130,100 Q115,120 100,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                )}
               </g>
             ) : (
               <g fill="currentColor">
-                {/* Head */}
                 <ellipse cx="100" cy="40" rx="25" ry="32" />
                 <rect x="85" y="65" width="30" height="20" rx="5" />
-                {/* Torso */}
                 <path d="M55,80 Q100,70 145,80 L135,220 Q100,230 65,220 Z" />
-                {/* Arms */}
                 <path d="M55,85 Q20,100 25,210 Q40,215 45,100 Z" />
                 <path d="M145,85 Q180,100 175,210 Q160,215 155,100 Z" />
-                {/* Legs */}
                 <path d="M65,215 L50,450 Q70,460 85,450 L95,230 Z" />
                 <path d="M135,215 L150,450 Q130,460 115,450 L105,230 Z" />
-                {/* Details (Back) */}
-                <path
-                  d="M100,80 L100,210"
-                  stroke="var(--background)"
-                  strokeWidth="2"
-                  fill="none"
-                  className="opacity-50"
-                />
-                <path
-                  d="M75,100 Q85,120 95,110"
-                  stroke="var(--background)"
-                  strokeWidth="2"
-                  fill="none"
-                  className="opacity-50"
-                />
-                <path
-                  d="M125,100 Q115,120 105,110"
-                  stroke="var(--background)"
-                  strokeWidth="2"
-                  fill="none"
-                  className="opacity-50"
-                />
+                {view === 'front' ? (
+                  <>
+                    <path
+                      d="M70,130 Q100,145 130,130"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M100,140 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <path
+                      d="M100,80 L100,210"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M75,100 Q85,120 95,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                    <path
+                      d="M125,100 Q115,120 105,110"
+                      stroke="var(--background)"
+                      strokeWidth="2"
+                      fill="none"
+                      className="opacity-50"
+                    />
+                  </>
+                )}
               </g>
             )}
           </svg>

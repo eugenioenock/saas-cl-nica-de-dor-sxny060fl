@@ -237,7 +237,7 @@ export default function PatientRecord() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <BodyMap patientId={patient.id} />
+              <BodyMap patientId={patient.id} gender={patient.gender} />
             </CardContent>
           </Card>
         </TabsContent>
