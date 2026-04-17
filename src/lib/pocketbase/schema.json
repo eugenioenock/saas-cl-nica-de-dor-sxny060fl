@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-17T22:25:33.824Z",
+  "generatedAt": "2026-04-17T22:29:23.345Z",
   "collections": [
     {
       "name": "users",
@@ -252,6 +252,40 @@
         }
       ],
       "indexes": []
+    },
+    {
+      "name": "pathologies_catalog",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_pathologies_catalog_name ON pathologies_catalog (name)"]
     }
   ]
 }

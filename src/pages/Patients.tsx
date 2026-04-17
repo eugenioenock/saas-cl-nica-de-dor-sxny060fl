@@ -53,6 +53,41 @@ export default function Patients() {
     gender: '',
   })
 
+  const [pathologies, setPathologies] = useState<string[]>([])
+  const [selectedPathology, setSelectedPathology] = useState<string>('all')
+  const [filteredPatientIds, setFilteredPatientIds] = useState<Set<string> | null>(null)
+
+  useEffect(() => {
+    const loadPathologies = async () => {
+      try {
+        const records = await pb.collection('pathologies_catalog').getFullList({ sort: 'name' })
+        setPathologies(records.map((r: any) => r.name))
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    loadPathologies()
+  }, [])
+
+  useEffect(() => {
+    const filterByPathology = async () => {
+      if (selectedPathology === 'all') {
+        setFilteredPatientIds(null)
+        return
+      }
+      try {
+        const points = await pb.collection('pain_points').getFullList({
+          filter: `pathologies ~ '"${selectedPathology}"' || pathologies ~ '${selectedPathology}'`,
+          fields: 'patient_id',
+        })
+        setFilteredPatientIds(new Set(points.map((p: any) => p.patient_id)))
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    filterByPathology()
+  }, [selectedPathology])
+
   const loadData = async () => {
     try {
       const records = await pb.collection('patients').getFullList({ sort: '-created' })
@@ -76,7 +111,8 @@ export default function Patients() {
     (p) =>
       (!p.clinicId || p.clinicId === activeClinic.id) &&
       (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.document?.includes(searchTerm)),
+        p.document?.includes(searchTerm)) &&
+      (filteredPatientIds === null || filteredPatientIds.has(p.id)),
   )
 
   const calculateAge = (dob: string) => {
@@ -218,8 +254,8 @@ export default function Patients() {
       </div>
 
       <Card>
-        <CardHeader className="py-4">
-          <div className="relative max-w-sm">
+        <CardHeader className="py-4 flex flex-col sm:flex-row gap-4 items-center">
+          <div className="relative flex-1 w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -229,6 +265,19 @@ export default function Patients() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Select value={selectedPathology} onValueChange={setSelectedPathology}>
+            <SelectTrigger className="w-full sm:w-[250px]">
+              <SelectValue placeholder="Filtrar por Patologia" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Patologias</SelectItem>
+              {pathologies.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
