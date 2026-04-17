@@ -252,14 +252,24 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle>Controle de Versão (GitHub)</CardTitle>
-            <CardDescription>Integração premium para salvar o histórico de código.</CardDescription>
+            <CardDescription>
+              Conecte um repositório GitHub para versionamento de código (Recurso Premium).
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-muted p-4 rounded-md text-sm text-muted-foreground flex items-start gap-4">
+            <div className="bg-muted p-4 rounded-md text-sm text-muted-foreground flex flex-col gap-4">
               <p>
-                Para ativar a integração com o GitHub e proteger o histórico do seu código, clique
-                no ícone Exportar/GitHub no cabeçalho da aplicação (Recurso Premium).
+                Acesse a plataforma Skip Cloud para conectar sua conta do GitHub. Isso permite
+                salvar automaticamente o histórico de alterações do seu sistema.
               </p>
+              <div>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open('https://skip.cloud', '_blank')}
+                >
+                  Configurar no Skip Cloud
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

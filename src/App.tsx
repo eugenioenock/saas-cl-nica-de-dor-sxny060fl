@@ -9,6 +9,7 @@ import Patients from './pages/Patients'
 import PatientRecord from './pages/PatientRecord'
 import Inventory from './pages/Inventory'
 import Finance from './pages/Finance'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import RecordsRedirect from './pages/RecordsRedirect'
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/records" element={<RecordsRedirect />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/finance" element={<Finance />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

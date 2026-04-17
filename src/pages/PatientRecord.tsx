@@ -354,7 +354,7 @@ export default function PatientRecord() {
                         stroke="hsl(var(--border))"
                       />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} />
-                      <YAxis tickLine={false} axisLine={false} tickMargin={10} domain={[0, 10]} />
+                      <YAxis tickLine={false} axisLine={false} tickMargin={10} domain={[1, 10]} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Line
                         type="monotone"

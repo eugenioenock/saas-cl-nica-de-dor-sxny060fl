@@ -7,6 +7,7 @@ import {
   DollarSign,
   Settings,
   Stethoscope,
+  BarChart3,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -27,6 +28,7 @@ const navItems = [
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
   { title: 'Financeiro', icon: DollarSign, url: '/finance' },
+  { title: 'Relatórios', icon: BarChart3, url: '/reports' },
 ]
 
 const settingsItems = [{ title: 'Configurações', icon: Settings, url: '/settings' }]
