@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Calendar, Activity, AlertTriangle, Clock } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, DollarSign, Activity, Bell } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import pb from '@/lib/pocketbase/client'
@@ -11,18 +11,21 @@ export default function Index() {
   const [totalPatients, setTotalPatients] = useState(0)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
   const [criticalPatients, setCriticalPatients] = useState<any[]>([])
+  const [revenue, setRevenue] = useState(0)
+  const [pending, setPending] = useState(0)
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [needsFollowUp, setNeedsFollowUp] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
     try {
-      const patientsRes = await pb.collection('patients').getList(1, 1)
-      setTotalPatients(patientsRes.totalItems)
+      const patientsRes = await pb.collection('patients').getFullList({ sort: '-created' })
+      setTotalPatients(patientsRes.length)
 
       const start = new Date()
       start.setHours(0, 0, 0, 0)
       const end = new Date()
       end.setHours(23, 59, 59, 999)
-
       const notes = await pb.collection('medical_notes').getFullList({
         filter: `date >= "${start.toISOString().replace('T', ' ')}" && date <= "${end.toISOString().replace('T', ' ')}"`,
         expand: 'patient_id',
@@ -30,12 +33,9 @@ export default function Index() {
       })
       setTodayAppointments(notes)
 
-      const critical = await pb.collection('pain_points').getList(1, 50, {
-        filter: 'intensity >= 8',
-        sort: '-created',
-        expand: 'patient_id',
-      })
-
+      const critical = await pb
+        .collection('pain_points')
+        .getList(1, 50, { filter: 'intensity >= 8', sort: '-created', expand: 'patient_id' })
       const seen = new Set()
       const dedupedCritical = []
       for (const pt of critical.items) {
@@ -45,6 +45,21 @@ export default function Index() {
         }
       }
       setCriticalPatients(dedupedCritical)
+
+      const finances = await pb
+        .collection('consultations_finance')
+        .getFullList({ expand: 'patient_id', sort: '-created' })
+      setRevenue(finances.filter((f) => f.status === 'paid').reduce((a, f) => a + f.amount, 0))
+      setPending(finances.filter((f) => f.status === 'pending').reduce((a, f) => a + f.amount, 0))
+      setRecentTransactions(finances.slice(0, 5))
+
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const recentNotes = await pb
+        .collection('medical_notes')
+        .getFullList({ filter: `created >= "${thirtyDaysAgo.toISOString().replace('T', ' ')}"` })
+      const activeIds = new Set(recentNotes.map((n) => n.patient_id))
+      setNeedsFollowUp(patientsRes.filter((p) => !activeIds.has(p.id)))
     } catch (error) {
       console.error(error)
     } finally {
@@ -55,31 +70,26 @@ export default function Index() {
   useEffect(() => {
     loadData()
   }, [])
-
   useRealtime('patients', loadData)
   useRealtime('medical_notes', loadData)
   useRealtime('pain_points', loadData)
+  useRealtime('consultations_finance', loadData)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
-        <p className="text-muted-foreground">Resumo diário e alertas críticos.</p>
+        <p className="text-muted-foreground">Resumo geral de atividades e finanças.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
-            ) : (
-              <div className="text-2xl font-bold">{totalPatients}</div>
-            )}
-            <p className="text-xs text-muted-foreground">Pacientes registrados</p>
+            <div className="text-2xl font-bold">{loading ? '-' : totalPatients}</div>
           </CardContent>
         </Card>
         <Card>
@@ -88,153 +98,137 @@ export default function Index() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
-            ) : (
-              <div className="text-2xl font-bold">{todayAppointments.length}</div>
-            )}
-            <p className="text-xs text-muted-foreground">Consultas marcadas para hoje</p>
+            <div className="text-2xl font-bold">{loading ? '-' : todayAppointments.length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Críticos</CardTitle>
-            <Activity className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium">Receita (Paga)</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="h-8 w-16 bg-muted animate-pulse rounded" />
-            ) : (
-              <div className="text-2xl font-bold text-destructive">{criticalPatients.length}</div>
-            )}
-            <p className="text-xs text-muted-foreground">Pacientes com dor ≥ 8</p>
+            <div className="text-2xl font-bold text-green-600">
+              R$ {loading ? '-' : revenue.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">A Receber (Pendente)</CardTitle>
+            <Activity className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-500">
+              R$ {loading ? '-' : pending.toFixed(2)}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card className="col-span-1">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Pacientes em Estado Crítico
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Alertas Críticos (Dor ≥ 8)
             </CardTitle>
-            <CardDescription>Último registro de dor com intensidade ≥ 8.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-4">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex justify-between items-center py-2">
-                      <div className="space-y-2">
-                        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                        <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-                      </div>
-                      <div className="h-6 w-16 bg-muted animate-pulse rounded-full" />
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-4 pr-4">
+                {criticalPatients.map((pt) => (
+                  <Link
+                    key={pt.id}
+                    to={`/pacientes/${pt.patient_id}`}
+                    className="flex justify-between items-center border-b pb-2 last:border-0 hover:bg-muted p-2 rounded -mx-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium hover:underline">
+                        {pt.expand?.patient_id?.name || 'Desconhecido'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(pt.created).toLocaleDateString()}
+                      </p>
                     </div>
-                  ))
-                ) : criticalPatients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhum alerta crítico no momento.
-                  </p>
-                ) : (
-                  criticalPatients.map((pt) => (
-                    <Link
-                      key={pt.id}
-                      to={`/pacientes/${pt.patient_id}`}
-                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0 hover:bg-muted/50 p-2 rounded-md transition-colors -mx-2"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none text-primary hover:underline">
-                          {pt.expand?.patient_id?.name || 'Paciente Desconhecido'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(pt.created).toLocaleDateString()} -{' '}
-                          {pt.name || 'Ponto sem nome'}
-                        </p>
-                      </div>
-                      <Badge variant="destructive" className="ml-auto">
-                        Intensidade {pt.intensity}
-                      </Badge>
-                    </Link>
-                  ))
+                    <Badge variant="destructive">Nível {pt.intensity}</Badge>
+                  </Link>
+                ))}
+                {!loading && criticalPatients.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Sem alertas críticos.</p>
                 )}
               </div>
             </ScrollArea>
           </CardContent>
         </Card>
 
-        <Card className="col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Agenda do Dia
+              <Bell className="h-5 w-5 text-blue-500" /> Necessita Retorno (30+ dias)
             </CardTitle>
-            <CardDescription>Consultas e procedimentos para hoje.</CardDescription>
+            <CardDescription>Pacientes sem prontuário recente.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-4">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex justify-between items-center py-2">
-                      <div className="space-y-2">
-                        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                        <div className="h-3 w-48 bg-muted animate-pulse rounded" />
-                      </div>
-                      <div className="h-6 w-20 bg-muted animate-pulse rounded-full" />
-                    </div>
-                  ))
-                ) : todayAppointments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma consulta para hoje.
+            <ScrollArea className="h-[230px]">
+              <div className="space-y-4 pr-4">
+                {needsFollowUp.map((pt) => (
+                  <div
+                    key={pt.id}
+                    className="flex justify-between items-center border-b pb-2 last:border-0"
+                  >
+                    <p className="text-sm font-medium">{pt.name}</p>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/pacientes/${pt.id}`}>Ver</Link>
+                    </Button>
+                  </div>
+                ))}
+                {!loading && needsFollowUp.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Todos os pacientes estão atualizados.
                   </p>
-                ) : (
-                  todayAppointments.map((apt) => (
-                    <div
-                      key={apt.id}
-                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {apt.expand?.patient_id?.name || 'Paciente Desconhecido'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {apt.content
-                            ? apt.content.substring(0, 50) + (apt.content.length > 50 ? '...' : '')
-                            : 'Sem descrição'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-xs font-semibold">
-                          {new Date(apt.date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={
-                            apt.status === 'completed'
-                              ? 'bg-green-100 text-green-800 border-green-200'
-                              : apt.status === 'cancelled'
-                                ? 'bg-red-100 text-red-800 border-red-200'
-                                : ''
-                          }
-                        >
-                          {apt.status === 'completed'
-                            ? 'Concluído'
-                            : apt.status === 'cancelled'
-                              ? 'Cancelado'
-                              : 'Agendado'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
                 )}
               </div>
             </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Transações Recentes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex justify-between items-center border-b pb-2 last:border-0"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{tx.expand?.patient_id?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(tx.created).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <Badge
+                      variant="outline"
+                      className={
+                        tx.status === 'paid'
+                          ? 'text-green-600'
+                          : tx.status === 'pending'
+                            ? 'text-orange-500'
+                            : ''
+                      }
+                    >
+                      {tx.status}
+                    </Badge>
+                    <span className="font-semibold">R$ {tx.amount.toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+              {!loading && recentTransactions.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhuma transação.</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

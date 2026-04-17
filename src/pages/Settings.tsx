@@ -251,6 +251,21 @@ export default function Settings() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Controle de Versão (GitHub)</CardTitle>
+            <CardDescription>Integração premium para salvar o histórico de código.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-muted p-4 rounded-md text-sm text-muted-foreground flex items-start gap-4">
+              <p>
+                Para ativar a integração com o GitHub e proteger o histórico do seu código, clique
+                no ícone Exportar/GitHub no cabeçalho da aplicação (Recurso Premium).
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Catálogo de Patologias</CardTitle>
             <CardDescription>
               Gerencie a lista de patologias disponíveis para o mapeamento de dor.

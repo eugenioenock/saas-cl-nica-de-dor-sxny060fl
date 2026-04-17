@@ -26,7 +26,7 @@ const navItems = [
   { title: 'Pacientes', icon: Users, url: '/pacientes' },
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
-  { title: 'Financeiro', icon: DollarSign, url: '/financial' },
+  { title: 'Financeiro', icon: DollarSign, url: '/finance' },
 ]
 
 const settingsItems = [{ title: 'Configurações', icon: Settings, url: '/settings' }]
