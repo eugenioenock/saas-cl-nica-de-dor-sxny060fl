@@ -144,7 +144,7 @@ export default function PatientRecord() {
             </div>
           </div>
           <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" /> Exportar Prontuário
+            <Printer className="mr-2 h-4 w-4" /> Exportar Resumo Clínico
           </Button>
         </div>
         <Tabs defaultValue="map">
