@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, MapPin, Trash2, Printer, Activity } from 'lucide-react'
+import {
+  ArrowLeft,
+  Loader2,
+  MapPin,
+  Trash2,
+  Printer,
+  Activity,
+  Check,
+  ChevronsUpDown,
+} from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
@@ -30,6 +39,16 @@ import { ProcedureModal } from '@/components/medical/procedure-modal'
 import { toast } from 'sonner'
 import { Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { cn } from '@/lib/utils'
 
 export default function PatientRecord() {
   const { id } = useParams()
@@ -48,6 +67,13 @@ export default function PatientRecord() {
     pathologies: [],
   })
   const [newPath, setNewPath] = useState('')
+  const [openPath, setOpenPath] = useState(false)
+
+  const getIntensityColor = (intensity: number) => {
+    if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
+    if (intensity >= 5) return 'bg-orange-500 hover:bg-orange-600 text-white'
+    return 'bg-green-500 hover:bg-green-600 text-white'
+  }
 
   const load = async () => {
     if (!id) return
@@ -239,7 +265,9 @@ export default function PatientRecord() {
                         </Button>
                         <div className="font-bold flex gap-2 items-center">
                           <MapPin className="h-4 w-4 text-red-500" /> {pt.name || 'Ponto'}{' '}
-                          <Badge>{pt.intensity || 5}</Badge>
+                          <Badge className={getIntensityColor(pt.intensity || 5)}>
+                            Nível {pt.intensity || 5}
+                          </Badge>
                         </div>
                         <p className="text-muted-foreground line-clamp-2 mt-1">{pt.notes}</p>
                         <div className="flex flex-wrap gap-1 mt-2">
@@ -361,41 +389,63 @@ export default function PatientRecord() {
               </div>
               <div>
                 <Label>Patologias</Label>
-                <div className="flex gap-2 mb-2 mt-1">
-                  <Select
-                    onValueChange={(v) => {
-                      if (!form.pathologies.includes(v))
-                        setForm({ ...form, pathologies: [...form.pathologies, v] })
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {data.catalog.map((c: string) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nova patologia"
-                    value={newPath}
-                    onChange={(e) => setNewPath(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addPath()}
-                  />
-                  <Button onClick={addPath} type="button">
-                    Add
-                  </Button>
+                <div className="mt-1">
+                  <Popover open={openPath} onOpenChange={setOpenPath}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openPath}
+                        className="w-full justify-between font-normal"
+                      >
+                        {form.pathologies.length > 0
+                          ? `${form.pathologies.length} patologia(s) selecionada(s)`
+                          : 'Selecione do catálogo...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar patologia..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhuma patologia encontrada.</CommandEmpty>
+                          <CommandGroup>
+                            {data.catalog.map((c: string) => (
+                              <CommandItem
+                                key={c}
+                                value={c}
+                                onSelect={() => {
+                                  if (!form.pathologies.includes(c)) {
+                                    setForm({ ...form, pathologies: [...form.pathologies, c] })
+                                  } else {
+                                    setForm({
+                                      ...form,
+                                      pathologies: form.pathologies.filter((x: string) => x !== c),
+                                    })
+                                  }
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4',
+                                    form.pathologies.includes(c) ? 'opacity-100' : 'opacity-0',
+                                  )}
+                                />
+                                {c}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {form.pathologies.map((p: string) => (
                     <Badge
                       key={p}
-                      className="cursor-pointer"
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
                       onClick={() =>
                         setForm({
                           ...form,

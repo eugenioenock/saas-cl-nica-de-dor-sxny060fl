@@ -29,7 +29,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Search, Plus, FileText, Loader2 } from 'lucide-react'
+import { Search, Plus, FileText, Loader2, Check, ChevronsUpDown } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -55,6 +65,7 @@ export default function Patients() {
 
   const [pathologies, setPathologies] = useState<string[]>([])
   const [selectedPathology, setSelectedPathology] = useState<string>('all')
+  const [openPathology, setOpenPathology] = useState(false)
   const [filteredPatientIds, setFilteredPatientIds] = useState<Set<string> | null>(null)
 
   useEffect(() => {
@@ -265,19 +276,64 @@ export default function Patients() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={selectedPathology} onValueChange={setSelectedPathology}>
-            <SelectTrigger className="w-full sm:w-[250px]">
-              <SelectValue placeholder="Filtrar por Patologia" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Patologias</SelectItem>
-              {pathologies.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={openPathology} onOpenChange={setOpenPathology}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={openPathology}
+                className="w-full sm:w-[250px] justify-between font-normal"
+              >
+                {selectedPathology === 'all'
+                  ? 'Todas as Patologias'
+                  : pathologies.find((p) => p === selectedPathology) || 'Todas as Patologias'}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar patologia..." />
+                <CommandList>
+                  <CommandEmpty>Nenhuma patologia encontrada.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="all"
+                      onSelect={() => {
+                        setSelectedPathology('all')
+                        setOpenPathology(false)
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          selectedPathology === 'all' ? 'opacity-100' : 'opacity-0',
+                        )}
+                      />
+                      Todas as Patologias
+                    </CommandItem>
+                    {pathologies.map((p) => (
+                      <CommandItem
+                        key={p}
+                        value={p}
+                        onSelect={(currentValue) => {
+                          setSelectedPathology(currentValue === selectedPathology ? 'all' : p)
+                          setOpenPathology(false)
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            selectedPathology === p ? 'opacity-100' : 'opacity-0',
+                          )}
+                        />
+                        {p}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </CardHeader>
         <CardContent className="p-0">
           <Table>

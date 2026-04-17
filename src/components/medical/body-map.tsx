@@ -8,7 +8,25 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, MapPin, MousePointerClick, Loader2, X, Plus } from 'lucide-react'
+import {
+  Trash2,
+  MapPin,
+  MousePointerClick,
+  Loader2,
+  X,
+  Plus,
+  Check,
+  ChevronsUpDown,
+} from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 
@@ -19,7 +37,8 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
   const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pathologyInputs, setPathologyInputs] = useState<Record<string, string>>({})
+  const [catalog, setCatalog] = useState<string[]>([])
+  const [openComboboxId, setOpenComboboxId] = useState<string | null>(null)
 
   const mapRef = useRef<HTMLDivElement>(null)
 
@@ -38,10 +57,20 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
 
   useEffect(() => {
     loadPoints()
+    pb.collection('pathologies_catalog')
+      .getFullList({ sort: 'name' })
+      .then((res) => setCatalog(res.map((c) => c.name)))
+      .catch(console.error)
   }, [patientId])
 
   useRealtime('pain_points', () => {
     loadPoints()
+  })
+  useRealtime('pathologies_catalog', () => {
+    pb.collection('pathologies_catalog')
+      .getFullList({ sort: 'name' })
+      .then((res) => setCatalog(res.map((c) => c.name)))
+      .catch(console.error)
   })
 
   const genderStr = gender?.toLowerCase() || ''
@@ -79,9 +108,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
     setPoints(points.map((p) => (p.id === id ? { ...p, ...updates } : p)))
   }
 
-  const handleAddPathology = async (pointId: string) => {
-    const text = pathologyInputs[pointId]?.trim()
-    if (!text) return
+  const handleAddPathologyFromCatalog = async (pointId: string, pathology: string) => {
     const pt = points.find((p) => p.id === pointId)
     if (!pt) return
 
@@ -90,18 +117,15 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
       currentList = [pt.name]
     }
 
-    if (!currentList.includes(text)) {
-      currentList.push(text)
+    if (!currentList.includes(pathology)) {
+      currentList.push(pathology)
       const updates = { pathologies: currentList }
       updatePoint(pointId, updates)
-      setPathologyInputs((prev) => ({ ...prev, [pointId]: '' }))
       try {
         await pb.collection('pain_points').update(pointId, updates)
       } catch (e) {
         console.error(e)
       }
-    } else {
-      setPathologyInputs((prev) => ({ ...prev, [pointId]: '' }))
     }
   }
 
@@ -489,29 +513,63 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                           })()}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="Adicionar patologia ou diagnóstico..."
-                            value={pathologyInputs[p.id] || ''}
-                            onChange={(e) =>
-                              setPathologyInputs((prev) => ({ ...prev, [p.id]: e.target.value }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                handleAddPathology(p.id)
-                              }
-                            }}
-                            className="h-8 text-xs"
-                          />
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-8 text-xs px-2 shrink-0"
-                            onClick={() => handleAddPathology(p.id)}
+                          <Popover
+                            open={openComboboxId === p.id}
+                            onOpenChange={(open) => setOpenComboboxId(open ? p.id : null)}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Adicionar
-                          </Button>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                role="combobox"
+                                aria-expanded={openComboboxId === p.id}
+                                className="h-8 text-xs justify-between w-full font-normal"
+                              >
+                                Adicionar do catálogo...
+                                <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[250px] p-0" align="start">
+                              <Command>
+                                <CommandInput
+                                  placeholder="Buscar patologia..."
+                                  className="h-8 text-xs"
+                                />
+                                <CommandList>
+                                  <CommandEmpty className="py-2 text-xs text-center text-muted-foreground">
+                                    Nenhuma patologia.
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {catalog.map((c) => {
+                                      const isSelected =
+                                        Array.isArray(p.pathologies) && p.pathologies.includes(c)
+                                      return (
+                                        <CommandItem
+                                          key={c}
+                                          value={c}
+                                          onSelect={() => {
+                                            if (!isSelected) {
+                                              handleAddPathologyFromCatalog(p.id, c)
+                                            }
+                                            setOpenComboboxId(null)
+                                          }}
+                                          className="text-xs"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              'mr-2 h-3 w-3',
+                                              isSelected ? 'opacity-100' : 'opacity-0',
+                                            )}
+                                          />
+                                          {c}
+                                        </CommandItem>
+                                      )
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
                       <div className="space-y-2 pt-1">
