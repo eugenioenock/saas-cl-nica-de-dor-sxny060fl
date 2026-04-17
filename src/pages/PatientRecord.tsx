@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppContext } from '@/hooks/use-app-context'
-import { mockPatients, mockAppointments, mockUsers, Appointment } from '@/lib/data'
+import { mockUsers, Appointment, Patient } from '@/lib/data'
+import { getPatient, getProcedures, saveProcedure } from '@/lib/db'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Activity } from 'lucide-react'
 import {
@@ -33,26 +35,37 @@ export default function PatientRecord() {
   const { activeClinic } = useAppContext()
   const { id } = useParams()
 
+  const [patient, setPatient] = useState<Patient | null>(null)
   const [localProcedures, setLocalProcedures] = useState<Appointment[]>([])
-  const [isInitialized, setIsInitialized] = useState(false)
-
-  const patient = useMemo(
-    () => mockPatients.find((p) => p.id === id && p.clinicId === activeClinic.id),
-    [id, activeClinic.id],
-  )
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (patient && !isInitialized) {
-      setLocalProcedures(
-        mockAppointments
-          .filter((apt) => apt.patientId === patient.id && apt.clinicId === activeClinic.id)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-      )
-      setIsInitialized(true)
+    const loadData = async () => {
+      if (!id) return
+      setLoading(true)
+      try {
+        const p = await getPatient(id)
+        if (!p || p.clinicId !== activeClinic.id) {
+          setError(true)
+          return
+        }
+        setPatient(p)
+        const procs = await getProcedures(id)
+        setLocalProcedures(
+          procs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        )
+      } catch (err) {
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [patient, activeClinic.id, isInitialized])
+    loadData()
+  }, [id, activeClinic.id])
 
-  const handleAddProcedure = useCallback((newProcedure: Appointment) => {
+  const handleAddProcedure = useCallback(async (newProcedure: Appointment) => {
+    await saveProcedure(newProcedure)
     setLocalProcedures((prev) =>
       [newProcedure, ...prev].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -60,7 +73,43 @@ export default function PatientRecord() {
     )
   }, [])
 
-  if (!patient) {
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-24" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-32" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Skeleton className="h-10 w-full max-w-md" />
+        <Card className="h-[400px]">
+          <CardContent className="p-6">
+            <Skeleton className="h-full w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error || !patient) {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-[50vh] text-center">
         <h2 className="text-2xl font-bold mb-4">Paciente não encontrado</h2>

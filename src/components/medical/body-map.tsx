@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -6,32 +6,35 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Trash2, MapPin, MousePointerClick, Info } from 'lucide-react'
+import { Slider } from '@/components/ui/slider'
+import { Trash2, MapPin, MousePointerClick, Loader2 } from 'lucide-react'
+import { getPainPoints, savePainPoint, deletePainPoint, PainPoint } from '@/lib/db'
 
 type MapView = 'front' | 'back'
 
-type Point = {
-  id: string
-  x: number
-  y: number
-  view: MapView
-  name: string
-  notes: string
-}
-
 export function BodyMap({ patientId, gender }: { patientId: string; gender?: string }) {
   const [view, setView] = useState<MapView>('front')
-  const [points, setPoints] = useState<Point[]>([])
+  const [points, setPoints] = useState<PainPoint[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const mapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const loadPoints = async () => {
+      setLoading(true)
+      const data = await getPainPoints(patientId)
+      setPoints(data)
+      setLoading(false)
+    }
+    loadPoints()
+  }, [patientId])
 
   const genderStr = gender?.toLowerCase() || ''
   const isFemale = genderStr === 'female' || genderStr === 'feminino'
   const isMale = genderStr === 'male' || genderStr === 'masculino'
 
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMapClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapRef.current) return
     // Prevent adding point if clicking on an existing marker
     if ((e.target as HTMLElement).closest('.map-marker')) return
@@ -40,40 +43,50 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
 
-    const newPoint: Point = {
+    const newPoint: PainPoint = {
       id: Math.random().toString(36).substring(7),
+      patientId,
       x,
       y,
       view,
       name: '',
       notes: '',
+      intensity: 5,
     }
 
     setPoints([...points, newPoint])
+    await savePainPoint(newPoint)
   }
 
-  const updatePoint = (id: string, updates: Partial<Point>) => {
+  const updatePoint = (id: string, updates: Partial<PainPoint>) => {
     setPoints(points.map((p) => (p.id === id ? { ...p, ...updates } : p)))
   }
 
-  const deletePoint = (id: string) => {
+  const saveUpdatedPoint = async (id: string) => {
+    const pt = points.find((p) => p.id === id)
+    if (pt) {
+      await savePainPoint(pt)
+    }
+  }
+
+  const handleDeletePoint = async (id: string) => {
     setPoints(points.filter((p) => p.id !== id))
+    await deletePainPoint(id)
   }
 
   const visiblePoints = points.filter((p) => p.view === view)
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[600px] border rounded-xl bg-muted/10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground font-medium">Carregando mapa anatômico...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <Alert className="bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-900">
-        <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-        <AlertDescription>
-          <strong>Aviso de Persistência:</strong> Os dados mapeados abaixo são mantidos
-          temporariamente durante esta sessão. Para salvá-los de forma permanente no prontuário do
-          paciente, é necessário integrar a aplicação a um banco de dados (ex: Supabase ou Skip
-          Cloud).
-        </AlertDescription>
-      </Alert>
-
       <div className="grid lg:grid-cols-2 gap-6 h-[600px]">
         <div className="relative border rounded-xl bg-muted/10 flex flex-col overflow-hidden">
           <div className="flex justify-center p-3 border-b bg-background/50 backdrop-blur-sm z-10">
@@ -259,14 +272,19 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
 
             {visiblePoints.map((p) => {
               const globalIndex = points.findIndex((pt) => pt.id === p.id)
+              const intensityColor =
+                (p.intensity || 5) >= 8
+                  ? 'bg-red-500 border-red-600 text-white'
+                  : (p.intensity || 5) >= 5
+                    ? 'bg-orange-500 border-orange-600 text-white'
+                    : 'bg-green-500 border-green-600 text-white'
               return (
                 <div
                   key={p.id}
                   className={cn(
-                    'map-marker absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 shadow-md cursor-pointer group z-10',
-                    hoveredPointId === p.id
-                      ? 'bg-primary text-primary-foreground scale-110 z-20'
-                      : 'bg-background border-2 border-primary text-primary',
+                    'map-marker absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 shadow-md cursor-pointer group z-10 border-2',
+                    hoveredPointId === p.id ? 'scale-110 z-20 ring-4 ring-primary/30' : '',
+                    intensityColor,
                     'hover:!bg-destructive hover:!text-destructive-foreground hover:!border-destructive hover:!scale-125 hover:!z-30',
                   )}
                   style={{ left: `${p.x}%`, top: `${p.y}%` }}
@@ -274,7 +292,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                   onMouseLeave={() => setHoveredPointId(null)}
                   onClick={(e) => {
                     e.stopPropagation()
-                    deletePoint(p.id)
+                    handleDeletePoint(p.id)
                   }}
                   title="Clique para remover este ponto"
                 >
@@ -354,7 +372,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => deletePoint(p.id)}
+                        onClick={() => handleDeletePoint(p.id)}
                         title="Remover ponto"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -366,14 +384,32 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                           placeholder="Nome da Localização (ex: Ombro Direito)"
                           value={p.name}
                           onChange={(e) => updatePoint(p.id, { name: e.target.value })}
+                          onBlur={() => saveUpdatedPoint(p.id)}
                           className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Intensidade: {p.intensity || 5}
+                          </span>
+                        </div>
+                        <Slider
+                          value={[p.intensity || 5]}
+                          min={1}
+                          max={10}
+                          step={1}
+                          onValueChange={([val]) => updatePoint(p.id, { intensity: val })}
+                          onValueCommit={() => saveUpdatedPoint(p.id)}
+                          className="py-2"
                         />
                       </div>
                       <div className="space-y-1">
                         <Textarea
-                          placeholder="Descrição, intensidade da dor, notas clínicas..."
+                          placeholder="Descrição e notas clínicas..."
                           value={p.notes}
                           onChange={(e) => updatePoint(p.id, { notes: e.target.value })}
+                          onBlur={() => saveUpdatedPoint(p.id)}
                           className="min-h-[60px] text-sm resize-none"
                         />
                       </div>
