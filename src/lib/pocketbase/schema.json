@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-17T22:23:14.836Z",
+  "generatedAt": "2026-04-17T22:25:33.824Z",
   "collections": [
     {
       "name": "users",
@@ -183,6 +183,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "pathologies",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

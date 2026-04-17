@@ -7,7 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
-import { Trash2, MapPin, MousePointerClick, Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Trash2, MapPin, MousePointerClick, Loader2, X, Plus } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 
@@ -18,6 +19,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
   const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pathologyInputs, setPathologyInputs] = useState<Record<string, string>>({})
 
   const mapRef = useRef<HTMLDivElement>(null)
 
@@ -61,6 +63,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
       y,
       view,
       name: '',
+      pathologies: [],
       notes: '',
       intensity: 5,
     }
@@ -76,12 +79,60 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
     setPoints(points.map((p) => (p.id === id ? { ...p, ...updates } : p)))
   }
 
+  const handleAddPathology = async (pointId: string) => {
+    const text = pathologyInputs[pointId]?.trim()
+    if (!text) return
+    const pt = points.find((p) => p.id === pointId)
+    if (!pt) return
+
+    let currentList = Array.isArray(pt.pathologies) ? [...pt.pathologies] : []
+    if (currentList.length === 0 && pt.name) {
+      currentList = [pt.name]
+    }
+
+    if (!currentList.includes(text)) {
+      currentList.push(text)
+      const updates = { pathologies: currentList }
+      updatePoint(pointId, updates)
+      setPathologyInputs((prev) => ({ ...prev, [pointId]: '' }))
+      try {
+        await pb.collection('pain_points').update(pointId, updates)
+      } catch (e) {
+        console.error(e)
+      }
+    } else {
+      setPathologyInputs((prev) => ({ ...prev, [pointId]: '' }))
+    }
+  }
+
+  const handleRemovePathology = async (pointId: string, pathToRemove: string) => {
+    const pt = points.find((p) => p.id === pointId)
+    if (!pt) return
+
+    let currentList = Array.isArray(pt.pathologies) ? [...pt.pathologies] : []
+    if (currentList.length === 0 && pt.name) {
+      currentList = [pt.name]
+    }
+
+    const newList = currentList.filter((p) => p !== pathToRemove)
+    const updates: any = { pathologies: newList }
+    if (pt.name === pathToRemove) {
+      updates.name = ''
+    }
+
+    updatePoint(pointId, updates)
+    try {
+      await pb.collection('pain_points').update(pointId, updates)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const saveUpdatedPoint = async (id: string) => {
     const pt = points.find((p) => p.id === id)
     if (pt) {
       try {
         await pb.collection('pain_points').update(id, {
-          name: pt.name,
           notes: pt.notes,
           intensity: pt.intensity,
         })
@@ -404,14 +455,64 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                       </Button>
                     </CardHeader>
                     <CardContent className="p-3 pt-2 space-y-3">
-                      <div className="space-y-1">
-                        <Input
-                          placeholder="Nome da Localização (ex: Ombro Direito)"
-                          value={p.name}
-                          onChange={(e) => updatePoint(p.id, { name: e.target.value })}
-                          onBlur={() => saveUpdatedPoint(p.id)}
-                          className="h-8 text-sm"
-                        />
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5 min-h-[24px] items-center">
+                          {(() => {
+                            const paths = Array.isArray(p.pathologies) ? p.pathologies : []
+                            const displayPaths = paths.length > 0 ? paths : p.name ? [p.name] : []
+                            if (displayPaths.length === 0)
+                              return (
+                                <span className="text-xs text-muted-foreground italic">
+                                  Nenhuma patologia
+                                </span>
+                              )
+                            return displayPaths.map((path, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="flex items-center gap-1 pr-1 text-xs"
+                              >
+                                {path}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4 w-4 p-0 hover:bg-transparent hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRemovePathology(p.id, path)
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </Badge>
+                            ))
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Adicionar patologia ou diagnóstico..."
+                            value={pathologyInputs[p.id] || ''}
+                            onChange={(e) =>
+                              setPathologyInputs((prev) => ({ ...prev, [p.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleAddPathology(p.id)
+                              }
+                            }}
+                            className="h-8 text-xs"
+                          />
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 text-xs px-2 shrink-0"
+                            onClick={() => handleAddPathology(p.id)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Adicionar
+                          </Button>
+                        </div>
                       </div>
                       <div className="space-y-2 pt-1">
                         <div className="flex items-center justify-between">
@@ -432,7 +533,7 @@ export function BodyMap({ patientId, gender }: { patientId: string; gender?: str
                       <div className="space-y-1">
                         <Textarea
                           placeholder="Descrição e notas clínicas..."
-                          value={p.notes}
+                          value={p.notes || ''}
                           onChange={(e) => updatePoint(p.id, { notes: e.target.value })}
                           onBlur={() => saveUpdatedPoint(p.id)}
                           className="min-h-[60px] text-sm resize-none"
