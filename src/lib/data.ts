@@ -8,6 +8,8 @@ export type Patient = {
   dob: string
   document: string
   gender: string
+  email?: string
+  phone?: string
 }
 export type Pathology = { id: string; name: string; icd: string }
 export type BodyPoint = { id: string; label: string; x: number; y: number; side: 'front' | 'back' }
