@@ -1,6 +1,7 @@
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppContext } from '@/hooks/use-app-context'
-import { mockPatients, mockAppointments, mockUsers } from '@/lib/data'
+import { mockPatients, mockAppointments, mockUsers, Appointment } from '@/lib/data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Activity } from 'lucide-react'
@@ -15,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { BodyMap } from '@/components/medical/body-map'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ProcedureModal } from '@/components/medical/procedure-modal'
 
 const calculateAge = (dob: string) => {
   const birthDate = new Date(dob)
@@ -31,7 +33,32 @@ export default function PatientRecord() {
   const { activeClinic } = useAppContext()
   const { id } = useParams()
 
-  const patient = mockPatients.find((p) => p.id === id && p.clinicId === activeClinic.id)
+  const [localProcedures, setLocalProcedures] = useState<Appointment[]>([])
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  const patient = useMemo(
+    () => mockPatients.find((p) => p.id === id && p.clinicId === activeClinic.id),
+    [id, activeClinic.id],
+  )
+
+  useEffect(() => {
+    if (patient && !isInitialized) {
+      setLocalProcedures(
+        mockAppointments
+          .filter((apt) => apt.patientId === patient.id && apt.clinicId === activeClinic.id)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      )
+      setIsInitialized(true)
+    }
+  }, [patient, activeClinic.id, isInitialized])
+
+  const handleAddProcedure = useCallback((newProcedure: Appointment) => {
+    setLocalProcedures((prev) =>
+      [newProcedure, ...prev].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
+    )
+  }, [])
 
   if (!patient) {
     return (
@@ -48,10 +75,6 @@ export default function PatientRecord() {
       </div>
     )
   }
-
-  const patientProcedures = mockAppointments
-    .filter((apt) => apt.patientId === patient.id && apt.clinicId === activeClinic.id)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const getProfessionalName = (profId?: string) => {
     if (!profId) return 'Não atribuído'
@@ -148,14 +171,17 @@ export default function PatientRecord() {
 
         <TabsContent value="procedures" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Procedimentos
-              </CardTitle>
-              <CardDescription>
-                Histórico de todos os procedimentos clínicos associados a este paciente.
-              </CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Procedimentos
+                </CardTitle>
+                <CardDescription>
+                  Histórico de todos os procedimentos clínicos associados a este paciente.
+                </CardDescription>
+              </div>
+              <ProcedureModal patientId={patient.id} onAdd={handleAddProcedure} />
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -168,13 +194,18 @@ export default function PatientRecord() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {patientProcedures.length > 0 ? (
-                    patientProcedures.map((proc) => (
+                  {localProcedures.length > 0 ? (
+                    localProcedures.map((proc) => (
                       <TableRow key={proc.id}>
                         <TableCell className="px-6 whitespace-nowrap">
                           {new Date(proc.date).toLocaleDateString('pt-BR')}
                         </TableCell>
-                        <TableCell className="font-medium">{proc.procedure}</TableCell>
+                        <TableCell
+                          className="font-medium max-w-[300px] truncate"
+                          title={proc.procedure}
+                        >
+                          {proc.procedure}
+                        </TableCell>
                         <TableCell>{getProfessionalName(proc.professionalId)}</TableCell>
                         <TableCell className="text-right px-6">
                           {getStatusBadge(proc.status)}
