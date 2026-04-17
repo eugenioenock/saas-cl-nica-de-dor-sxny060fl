@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Activity } from 'lucide-react'
+import pb from '@/lib/pocketbase/client'
 
 export default function Login() {
   const { signIn, user, loading } = useAuth()
@@ -12,6 +13,16 @@ export default function Login() {
   const [password, setPassword] = useState('Skip@Pass')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [settings, setSettings] = useState<any>(null)
+
+  useEffect(() => {
+    pb.collection('clinic_settings')
+      .getList(1, 1)
+      .then((res) => {
+        if (res.items.length > 0) setSettings(res.items[0])
+      })
+      .catch(console.error)
+  }, [])
 
   if (loading) return null
   if (user) return <Navigate to="/dashboard" replace />
@@ -40,8 +51,16 @@ export default function Login() {
           <div className="absolute inset-0 bg-primary/80 mix-blend-multiply" />
         </div>
         <div className="relative z-10 flex items-center gap-2 text-2xl font-bold">
-          <Activity className="h-8 w-8" />
-          <span>SpineCare Solutions</span>
+          {settings?.logo ? (
+            <img
+              src={pb.files.getURL(settings, settings.logo)}
+              alt={settings?.name || 'Clinic Logo'}
+              className="h-10 w-auto object-contain bg-white/10 rounded p-1"
+            />
+          ) : (
+            <Activity className="h-8 w-8" />
+          )}
+          <span>{settings?.name || 'SpineCare Solutions'}</span>
         </div>
         <div className="relative z-10 mt-auto">
           <h1 className="text-4xl font-bold mb-4">Bem-vindo(a) ao seu portal clínico.</h1>
@@ -57,8 +76,16 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-2 mb-6 md:hidden text-primary">
-              <Activity className="h-8 w-8" />
-              <span className="text-2xl font-bold">SpineCare</span>
+              {settings?.logo ? (
+                <img
+                  src={pb.files.getURL(settings, settings.logo)}
+                  alt={settings?.name || 'Clinic Logo'}
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <Activity className="h-8 w-8" />
+              )}
+              <span className="text-2xl font-bold">{settings?.name || 'SpineCare'}</span>
             </div>
             <h2 className="text-3xl font-bold tracking-tight">Acesso ao Sistema</h2>
             <p className="text-muted-foreground mt-2">

@@ -68,6 +68,7 @@ export default function PatientRecord() {
   })
   const [newPath, setNewPath] = useState('')
   const [openPath, setOpenPath] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
@@ -177,8 +178,23 @@ export default function PatientRecord() {
               <p className="text-muted-foreground">{data.patient.document}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" /> Exportar Resumo Clínico
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsExporting(true)
+              setTimeout(() => {
+                window.print()
+                setIsExporting(false)
+              }, 800)
+            }}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="mr-2 h-4 w-4" />
+            )}
+            {isExporting ? 'Gerando PDF...' : 'Exportar PDF'}
           </Button>
         </div>
         <Tabs defaultValue="map">
@@ -525,6 +541,16 @@ export default function PatientRecord() {
             <div>
               <strong>Gênero:</strong> {data.patient.gender || '-'}
             </div>
+            {data.patient.email && (
+              <div>
+                <strong>Email:</strong> {data.patient.email}
+              </div>
+            )}
+            {data.patient.phone && (
+              <div>
+                <strong>Telefone:</strong> {data.patient.phone}
+              </div>
+            )}
           </div>
         </div>
 

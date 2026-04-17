@@ -23,6 +23,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>
 }
 
+// Reminder: GitHub integration is a premium feature available via the Skip Cloud dashboard to version control these new implementations.
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
     <AuthProvider>
