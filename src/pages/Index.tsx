@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Calendar, AlertTriangle, DollarSign, Activity, Bell, Plus } from 'lucide-react'
+import {
+  Users,
+  Calendar,
+  AlertTriangle,
+  DollarSign,
+  Activity,
+  Bell,
+  Plus,
+  Undo2,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,6 +25,7 @@ export default function Index() {
   const [criticalPatients, setCriticalPatients] = useState<any[]>([])
   const [revenue, setRevenue] = useState(0)
   const [pending, setPending] = useState(0)
+  const [pendingReturns, setPendingReturns] = useState(0)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [needsFollowUp, setNeedsFollowUp] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,6 +66,29 @@ export default function Index() {
       setPending(finances.filter((f) => f.status === 'pending').reduce((a, f) => a + f.amount, 0))
       setRecentTransactions(finances.slice(0, 5))
 
+      const allAppointments = await pb.collection('appointments').getFullList()
+      const now = new Date()
+      const patientsWithCompletedPast = new Set()
+      const patientsWithFuture = new Set()
+
+      for (const apt of allAppointments) {
+        const aptDate = new Date(apt.start_time)
+        if (apt.status === 'completed' && aptDate < now) {
+          patientsWithCompletedPast.add(apt.patient_id)
+        }
+        if ((apt.status === 'scheduled' || apt.status === 'confirmed') && aptDate >= now) {
+          patientsWithFuture.add(apt.patient_id)
+        }
+      }
+
+      let pendingReturnsCount = 0
+      for (const pid of patientsWithCompletedPast) {
+        if (!patientsWithFuture.has(pid)) {
+          pendingReturnsCount++
+        }
+      }
+      setPendingReturns(pendingReturnsCount)
+
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const recentNotes = await pb
@@ -91,7 +124,7 @@ export default function Index() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
@@ -130,6 +163,15 @@ export default function Index() {
             <div className="text-2xl font-bold text-orange-500">
               R$ {loading ? '-' : pending.toFixed(2)}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Retornos Pendentes</CardTitle>
+            <Undo2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{loading ? '-' : pendingReturns}</div>
           </CardContent>
         </Card>
       </div>

@@ -22,6 +22,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -69,6 +79,7 @@ export default function PatientRecord() {
   const [newPath, setNewPath] = useState('')
   const [openPath, setOpenPath] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [noteToSign, setNoteToSign] = useState<string | null>(null)
 
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
@@ -135,6 +146,24 @@ export default function PatientRecord() {
     if (newPath.trim() && !form.pathologies.includes(newPath.trim())) {
       setForm({ ...form, pathologies: [...form.pathologies, newPath.trim()] })
       setNewPath('')
+    }
+  }
+
+  const confirmSignNote = async () => {
+    if (!noteToSign) return
+    try {
+      const hash = 'sig_' + Math.random().toString(36).substring(2) + Date.now().toString(36)
+      await pb.collection('medical_notes').update(noteToSign, {
+        is_signed: true,
+        signed_at: new Date().toISOString(),
+        signature_hash: hash,
+      })
+      toast.success('Prontuário assinado com sucesso!')
+      load()
+    } catch (error) {
+      toast.error('Erro ao assinar prontuário')
+    } finally {
+      setNoteToSign(null)
     }
   }
 
@@ -314,14 +343,40 @@ export default function PatientRecord() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {data.notes.map((n: any) => (
-                  <div key={n.id} className="p-4 border rounded-lg">
-                    <div className="font-semibold text-primary">
-                      {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'} •{' '}
-                      {new Date(n.created).toLocaleDateString()}
+                  <div
+                    key={n.id}
+                    className={cn(
+                      'p-4 border rounded-lg relative',
+                      n.is_signed ? 'bg-slate-50 dark:bg-slate-900' : '',
+                    )}
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                      <div className="font-semibold text-primary">
+                        {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'} •{' '}
+                        {new Date(n.created).toLocaleDateString()}
+                      </div>
+                      {n.is_signed ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
+                        >
+                          <Check className="w-3 h-3" /> Assinado Digitalmente em{' '}
+                          {new Date(n.signed_at).toLocaleDateString()}
+                        </Badge>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => setNoteToSign(n.id)}>
+                          Assinar Prontuário
+                        </Button>
+                      )}
                     </div>
                     <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90">
                       {n.content}
                     </p>
+                    {n.is_signed && n.signature_hash && (
+                      <p className="mt-4 text-xs text-muted-foreground font-mono">
+                        Hash: {n.signature_hash}
+                      </p>
+                    )}
                   </div>
                 ))}
                 {data.notes.length === 0 && (
@@ -487,6 +542,22 @@ export default function PatientRecord() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={!!noteToSign} onOpenChange={(open) => !open && setNoteToSign(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Assinar Prontuário</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ao assinar este documento, ele se tornará permanente e não poderá mais ser editado
+                ou excluído. Deseja prosseguir?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmSignNote}>Sim, Assinar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Print Only Section */}
@@ -594,9 +665,16 @@ export default function PatientRecord() {
           <div className="space-y-4 mt-2 p-2">
             {data.notes.map((n: any) => (
               <div key={n.id} className="pb-3 border-b border-dashed border-gray-300 last:border-0">
-                <div className="font-bold">
-                  {new Date(n.created).toLocaleDateString()} -{' '}
-                  {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
+                <div className="font-bold flex justify-between items-center">
+                  <span>
+                    {new Date(n.created).toLocaleDateString()} -{' '}
+                    {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
+                  </span>
+                  {n.is_signed && (
+                    <span className="text-xs font-normal text-gray-500">
+                      Assinado: {new Date(n.signed_at).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-gray-800 whitespace-pre-wrap">{n.content}</p>
               </div>
