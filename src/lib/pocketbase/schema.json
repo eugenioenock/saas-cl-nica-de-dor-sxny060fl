@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T00:34:15.242Z",
+  "generatedAt": "2026-04-18T00:37:15.613Z",
   "collections": [
     {
       "name": "users",
@@ -359,6 +359,18 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "opening_time",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "closing_time",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

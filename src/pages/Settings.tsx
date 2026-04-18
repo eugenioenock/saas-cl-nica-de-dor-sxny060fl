@@ -27,6 +27,8 @@ export default function Settings() {
     phone: '',
     email: '',
     address: '',
+    opening_time: '',
+    closing_time: '',
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoUrl, setLogoUrl] = useState('')
@@ -54,6 +56,8 @@ export default function Settings() {
           phone: record.phone || '',
           email: record.email || '',
           address: record.address || '',
+          opening_time: record.opening_time || '08:00',
+          closing_time: record.closing_time || '18:00',
         })
         if (record.logo) {
           setLogoUrl(pb.files.getURL(record, record.logo))
@@ -78,6 +82,8 @@ export default function Settings() {
       formData.append('phone', clinicSettings.phone)
       formData.append('email', clinicSettings.email)
       formData.append('address', clinicSettings.address)
+      formData.append('opening_time', clinicSettings.opening_time)
+      formData.append('closing_time', clinicSettings.closing_time)
       if (logoFile) {
         formData.append('logo', logoFile)
       }
@@ -176,6 +182,28 @@ export default function Settings() {
                     value={clinicSettings.address}
                     onChange={(e) =>
                       setClinicSettings({ ...clinicSettings, address: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="opening-time">Abertura</Label>
+                  <Input
+                    id="opening-time"
+                    type="time"
+                    value={clinicSettings.opening_time}
+                    onChange={(e) =>
+                      setClinicSettings({ ...clinicSettings, opening_time: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="closing-time">Fechamento</Label>
+                  <Input
+                    id="closing-time"
+                    type="time"
+                    value={clinicSettings.closing_time}
+                    onChange={(e) =>
+                      setClinicSettings({ ...clinicSettings, closing_time: e.target.value })
                     }
                   />
                 </div>

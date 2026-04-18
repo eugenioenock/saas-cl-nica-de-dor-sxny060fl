@@ -125,6 +125,22 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
   const onSubmit = async (v: z.infer<typeof formSchema>) => {
     setSaving(true)
     try {
+      const settingsRes = await pb
+        .collection('clinic_settings')
+        .getList(1, 1)
+        .catch(() => null)
+      const clinicSettings = settingsRes?.items[0]
+      const openingTime = clinicSettings?.opening_time || '08:00'
+      const closingTime = clinicSettings?.closing_time || '18:00'
+
+      if (v.startTime < openingTime || v.endTime > closingTime) {
+        form.setError('startTime', {
+          message: `Agendamentos devem ser dentro do horário da clínica: ${openingTime} - ${closingTime}`,
+        })
+        setSaving(false)
+        return
+      }
+
       const payload = {
         patient_id: v.patient_id,
         professional_id: v.professional_id,

@@ -1,29 +1,83 @@
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DollarSign, Activity, TrendingUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
-import { format, isSameMonth, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from '@/components/ui/chart'
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
+import { Loader2, Users, CalendarCheck, TrendingUp, Activity } from 'lucide-react'
 
 export default function Index() {
-  const [finances, setFinances] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [kpis, setKpis] = useState({
+    totalPatients: 0,
+    totalAppointments: 0,
+    totalRevenue: 0,
+    pendingRevenue: 0,
+  })
+  const [performanceData, setPerformanceData] = useState<any[]>([])
 
   const loadData = async () => {
     try {
-      const records = await pb.collection('consultations_finance').getFullList({ sort: '-created' })
-      setFinances(records)
-    } catch (err) {
-      console.error(err)
+      const [patients, appointments, finances, usersRes] = await Promise.all([
+        pb.collection('patients').getFullList(),
+        pb.collection('appointments').getFullList(),
+        pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
+        pb.collection('users').getFullList(),
+      ])
+
+      const totalRevenue = finances
+        .filter((f) => f.status === 'paid')
+        .reduce((sum, f) => sum + f.amount, 0)
+
+      const pendingRevenue = finances
+        .filter((f) => f.status === 'pending')
+        .reduce((sum, f) => sum + f.amount, 0)
+
+      setKpis({
+        totalPatients: patients.length,
+        totalAppointments: appointments.length,
+        totalRevenue,
+        pendingRevenue,
+      })
+
+      // Aggregate Professional Performance
+      const userMap = new Map(usersRes.map((u) => [u.id, u.name || u.email || 'Desconhecido']))
+      const perfMap: Record<string, { name: string; consultations: number; revenue: number }> = {}
+
+      // Count consultations
+      appointments.forEach((app) => {
+        const profId = app.professional_id
+        if (!profId) return
+        if (!perfMap[profId]) {
+          perfMap[profId] = {
+            name: userMap.get(profId) || 'Desconhecido',
+            consultations: 0,
+            revenue: 0,
+          }
+        }
+        perfMap[profId].consultations += 1
+      })
+
+      // Sum revenue
+      finances.forEach((f) => {
+        if (f.status !== 'paid') return
+        const profId = f.expand?.medical_note_id?.professionalId
+        if (profId) {
+          if (!perfMap[profId]) {
+            perfMap[profId] = {
+              name: userMap.get(profId) || 'Desconhecido',
+              consultations: 0,
+              revenue: 0,
+            }
+          }
+          perfMap[profId].revenue += f.amount
+        }
+      })
+
+      const chartData = Object.values(perfMap).sort((a, b) => b.consultations - a.consultations)
+      setPerformanceData(chartData)
+    } catch (e) {
+      console.error('Error loading dashboard data', e)
     } finally {
       setLoading(false)
     }
@@ -32,195 +86,158 @@ export default function Index() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useRealtime('appointments', loadData)
   useRealtime('consultations_finance', loadData)
+  useRealtime('patients', loadData)
+  useRealtime('medical_notes', loadData)
 
-  const now = new Date()
-
-  const currentMonthPaid = finances
-    .filter(
-      (f) =>
-        f.status === 'paid' &&
-        (f.due_date
-          ? isSameMonth(parseISO(f.due_date), now)
-          : isSameMonth(parseISO(f.created), now)),
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     )
-    .reduce((sum, f) => sum + f.amount, 0)
-
-  const pendingAmount = finances
-    .filter((f) => f.status === 'pending')
-    .reduce((sum, f) => sum + f.amount, 0)
-
-  const revenuePrediction = finances
-    .filter(
-      (f) =>
-        (f.status === 'paid' || f.status === 'pending') &&
-        (f.due_date
-          ? isSameMonth(parseISO(f.due_date), now)
-          : isSameMonth(parseISO(f.created), now)),
-    )
-    .reduce((sum, f) => sum + f.amount, 0)
-
-  const monthlyDataMap = finances.reduce(
-    (acc, f) => {
-      if (f.status === 'cancelled') return acc
-      const date = f.due_date ? parseISO(f.due_date) : parseISO(f.created)
-      const month = format(date, 'MMM/yy', { locale: ptBR })
-      if (!acc[month]) acc[month] = { month, paid: 0, pending: 0 }
-      if (f.status === 'paid') acc[month].paid += f.amount
-      else if (f.status === 'pending') acc[month].pending += f.amount
-      return acc
-    },
-    {} as Record<string, any>,
-  )
-
-  const monthlyData = []
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const month = format(d, 'MMM/yy', { locale: ptBR })
-    monthlyData.push(monthlyDataMap[month] || { month, paid: 0, pending: 0 })
   }
 
-  const paymentMethodsMap = finances.reduce(
-    (acc, f) => {
-      if (f.status === 'paid') {
-        const method = f.payment_method || 'unknown'
-        acc[method] = (acc[method] || 0) + f.amount
-      }
-      return acc
-    },
-    {} as Record<string, number>,
-  )
-
-  const paymentMethodsData = Object.entries(paymentMethodsMap).map(([name, value]) => ({
-    name:
-      name === 'pix'
-        ? 'PIX'
-        : name === 'card'
-          ? 'Cartão'
-          : name === 'cash'
-            ? 'Dinheiro'
-            : name === 'transfer'
-              ? 'Transferência'
-              : 'Outro',
-    value,
-  }))
-
-  const COLORS = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-  ]
-
-  const paymentChartConfig = paymentMethodsData.reduce(
-    (acc, d, i) => {
-      acc[d.name] = { label: d.name, color: COLORS[i % COLORS.length] }
-      return acc
-    },
-    {} as Record<string, any>,
-  )
-
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard Financeiro</h1>
-        <p className="text-muted-foreground">Acompanhe a saúde financeira da clínica.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">Visão geral do desempenho e métricas da clínica.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Faturamento Pago (Mês Atual)</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium">Pacientes Ativos</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              R$ {currentMonthPaid.toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold">{kpis.totalPatients}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recebimentos Pendentes</CardTitle>
-            <Activity className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium">Total de Consultas</CardTitle>
+            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">R$ {pendingAmount.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{kpis.totalAppointments}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Previsão de Receita (Mês Atual)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium">Receita Gerada</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              R$ {revenuePrediction.toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold">R$ {kpis.totalRevenue.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Receita Pendente</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">R$ {kpis.pendingRevenue.toFixed(2)}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Receita Mensal</CardTitle>
+            <CardTitle>Volume de Consultas por Profissional</CardTitle>
+            <CardDescription>
+              Número total de atendimentos agendados por membro da equipe.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                paid: { label: 'Pago', color: 'hsl(var(--chart-1))' },
-                pending: { label: 'Pendente', color: 'hsl(var(--chart-2))' },
-              }}
-              className="h-[300px] w-full"
-            >
-              <BarChart data={monthlyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `R$ ${value}`} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="paid" fill="var(--color-paid)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="pending" fill="var(--color-pending)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Métodos de Pagamento (Pagos)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center items-center h-[300px]">
-            {paymentMethodsData.length > 0 ? (
-              <ChartContainer config={paymentChartConfig} className="h-full w-full">
-                <PieChart>
-                  <Pie
-                    data={paymentMethodsData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
+            {performanceData.length > 0 ? (
+              <ChartContainer
+                config={{ consultations: { label: 'Consultas', color: 'hsl(var(--primary))' } }}
+                className="h-[300px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={performanceData}
+                    margin={{ top: 20, right: 0, left: 0, bottom: 20 }}
                   >
-                    {paymentMethodsData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip
-                    content={<ChartTooltipContent valueFormatter={(v) => `R$ ${v}`} />}
-                  />
-                  <ChartLegend content={<ChartLegendContent />} className="flex-wrap" />
-                </PieChart>
+                    <XAxis
+                      dataKey="name"
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                    <Bar
+                      dataKey="consultations"
+                      fill="var(--color-consultations)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartContainer>
             ) : (
-              <p className="text-muted-foreground text-sm">
-                Nenhum dado de pagamento pago disponível.
-              </p>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                Sem dados suficientes
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Receita por Profissional</CardTitle>
+            <CardDescription>
+              Valor gerado vinculado aos prontuários e pagamentos confirmados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {performanceData.some((d) => d.revenue > 0) ? (
+              <ChartContainer
+                config={{ revenue: { label: 'Receita (R$)', color: 'hsl(var(--chart-2))' } }}
+                className="h-[300px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={performanceData}
+                    margin={{ top: 20, right: 0, left: 0, bottom: 20 }}
+                  >
+                    <XAxis
+                      dataKey="name"
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `R$${value}`}
+                    />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground text-center px-4">
+                Receita por profissional requer faturamentos pagos e vinculados a prontuários
+                médicos.
+              </div>
             )}
           </CardContent>
         </Card>
