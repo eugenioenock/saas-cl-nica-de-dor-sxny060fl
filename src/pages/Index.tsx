@@ -17,6 +17,22 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Link } from 'react-router-dom'
 import { AppointmentSheet } from '@/components/agenda/appointment-sheet'
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Cell } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart'
+
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+]
 
 export default function Index() {
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -28,6 +44,8 @@ export default function Index() {
   const [pendingReturns, setPendingReturns] = useState(0)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [needsFollowUp, setNeedsFollowUp] = useState<any[]>([])
+  const [monthlyVolume, setMonthlyVolume] = useState<any[]>([])
+  const [specialtyDistribution, setSpecialtyDistribution] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
@@ -71,6 +89,24 @@ export default function Index() {
       const patientsWithCompletedPast = new Set()
       const patientsWithFuture = new Set()
 
+      const currentYear = now.getFullYear()
+      const months = [
+        'Jan',
+        'Fev',
+        'Mar',
+        'Abr',
+        'Mai',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Set',
+        'Out',
+        'Nov',
+        'Dez',
+      ]
+      const monthlyMap = Array(12).fill(0)
+      const specMap: Record<string, number> = {}
+
       for (const apt of allAppointments) {
         const aptDate = new Date(apt.start_time)
         if (apt.status === 'completed' && aptDate < now) {
@@ -79,7 +115,22 @@ export default function Index() {
         if ((apt.status === 'scheduled' || apt.status === 'confirmed') && aptDate >= now) {
           patientsWithFuture.add(apt.patient_id)
         }
+
+        // Analytics
+        if (aptDate.getFullYear() === currentYear) {
+          monthlyMap[aptDate.getMonth()]++
+        }
+        const spec = apt.specialty || 'Geral'
+        specMap[spec] = (specMap[spec] || 0) + 1
       }
+
+      setMonthlyVolume(months.map((month, i) => ({ month, count: monthlyMap[i] })))
+      setSpecialtyDistribution(
+        Object.entries(specMap)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5),
+      )
 
       let pendingReturnsCount = 0
       for (const pid of patientsWithCompletedPast) {
@@ -112,8 +163,22 @@ export default function Index() {
   useRealtime('pain_points', loadData)
   useRealtime('consultations_finance', loadData)
 
+  const volumeChartConfig = {
+    count: { label: 'Agendamentos', color: 'hsl(var(--primary))' },
+  }
+
+  const specialtyChartConfig = {
+    value: { label: 'Especialidade' },
+    ...Object.fromEntries(
+      specialtyDistribution.map((s, i) => [
+        s.name,
+        { label: s.name, color: COLORS[i % COLORS.length] },
+      ]),
+    ),
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
@@ -219,7 +284,7 @@ export default function Index() {
             <CardDescription>Pacientes sem prontuário recente.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[230px]">
+            <ScrollArea className="h-[250px]">
               <div className="space-y-4 pr-4">
                 {needsFollowUp.map((pt) => (
                   <div
@@ -241,50 +306,69 @@ export default function Index() {
             </ScrollArea>
           </CardContent>
         </Card>
+      </div>
 
-        <Card className="md:col-span-2">
+      {/* Analytics Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Transações Recentes</CardTitle>
+            <CardTitle>Volume de Agendamentos ({new Date().getFullYear()})</CardTitle>
+            <CardDescription>Histórico mensal de consultas.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex justify-between items-center border-b pb-2 last:border-0"
+            <div className="h-[300px]">
+              <ChartContainer config={volumeChartConfig} className="w-full h-full">
+                <BarChart
+                  data={monthlyVolume}
+                  margin={{ top: 20, right: 20, bottom: 0, left: -20 }}
                 >
-                  <div>
-                    <p className="text-sm font-medium">{tx.expand?.patient_id?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(tx.created).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Badge
-                      variant="outline"
-                      className={
-                        tx.status === 'paid'
-                          ? 'text-green-600'
-                          : tx.status === 'pending'
-                            ? 'text-orange-500'
-                            : ''
-                      }
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição por Especialidade</CardTitle>
+            <CardDescription>Especialidades mais frequentes nas consultas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              {specialtyDistribution.length > 0 ? (
+                <ChartContainer config={specialtyChartConfig} className="w-full h-full">
+                  <PieChart>
+                    <Pie
+                      data={specialtyDistribution}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {tx.status}
-                    </Badge>
-                    <span className="font-semibold">R$ {tx.amount.toFixed(2)}</span>
-                  </div>
+                      {specialtyDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} className="flex-wrap" />
+                  </PieChart>
+                </ChartContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  Sem dados suficientes.
                 </div>
-              ))}
-              {!loading && recentTransactions.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhuma transação.</p>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <AppointmentSheet open={sheetOpen} onOpenChange={setSheetOpen} selectedDate={new Date()} />
     </div>
   )
 }

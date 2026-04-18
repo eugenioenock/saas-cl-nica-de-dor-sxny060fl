@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T00:24:28.410Z",
+  "generatedAt": "2026-04-18T00:30:48.025Z",
   "collections": [
     {
       "name": "users",
@@ -500,6 +500,12 @@
           "required": true,
           "system": false,
           "collectionRef": "users"
+        },
+        {
+          "name": "specialty",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX idx_appointments_start ON appointments (start_time)"]

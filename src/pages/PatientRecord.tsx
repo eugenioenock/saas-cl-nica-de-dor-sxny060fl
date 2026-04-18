@@ -64,6 +64,7 @@ export default function PatientRecord() {
   const { id } = useParams()
   const [data, setData] = useState<any>({ patient: null, points: [], notes: [], catalog: [] })
   const [clinicSettings, setClinicSettings] = useState<any>(null)
+  const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [view, setView] = useState<'front' | 'back'>('front')
@@ -80,6 +81,7 @@ export default function PatientRecord() {
   const [openPath, setOpenPath] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [noteToSign, setNoteToSign] = useState<string | null>(null)
+  const [noteToPrint, setNoteToPrint] = useState<any | null>(null)
 
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
@@ -90,7 +92,7 @@ export default function PatientRecord() {
   const load = async () => {
     if (!id) return
     try {
-      const [patient, points, notes, catalog, settingsRes] = await Promise.all([
+      const [patient, points, notes, catalog, settingsRes, usersRes] = await Promise.all([
         pb.collection('patients').getOne(id!),
         pb
           .collection('pain_points')
@@ -103,8 +105,10 @@ export default function PatientRecord() {
           .collection('clinic_settings')
           .getList(1, 1)
           .catch(() => null),
+        pb.collection('users').getFullList(),
       ])
       setData({ patient, points, notes, catalog: catalog.map((c) => c.name) })
+      setUsers(usersRes)
       if (settingsRes && settingsRes.items.length > 0) {
         setClinicSettings(settingsRes.items[0])
       }
@@ -167,6 +171,23 @@ export default function PatientRecord() {
     }
   }
 
+  const handlePrintNote = (note: any) => {
+    setNoteToPrint(note)
+    setTimeout(() => {
+      window.print()
+      setNoteToPrint(null)
+    }, 500)
+  }
+
+  const handleExportFullRecord = () => {
+    setNoteToPrint(null)
+    setIsExporting(true)
+    setTimeout(() => {
+      window.print()
+      setIsExporting(false)
+    }, 800)
+  }
+
   if (loading)
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -207,23 +228,13 @@ export default function PatientRecord() {
               <p className="text-muted-foreground">{data.patient.document}</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsExporting(true)
-              setTimeout(() => {
-                window.print()
-                setIsExporting(false)
-              }, 800)
-            }}
-            disabled={isExporting}
-          >
+          <Button variant="outline" onClick={handleExportFullRecord} disabled={isExporting}>
             {isExporting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Printer className="mr-2 h-4 w-4" />
             )}
-            {isExporting ? 'Gerando PDF...' : 'Exportar PDF'}
+            {isExporting ? 'Gerando PDF...' : 'Exportar Ficha Completa'}
           </Button>
         </div>
         <Tabs defaultValue="map">
@@ -355,26 +366,31 @@ export default function PatientRecord() {
                         {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'} •{' '}
                         {new Date(n.created).toLocaleDateString()}
                       </div>
-                      {n.is_signed ? (
-                        <Badge
-                          variant="secondary"
-                          className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
-                        >
-                          <Check className="w-3 h-3" /> Assinado Digitalmente em{' '}
-                          {new Date(n.signed_at).toLocaleDateString()}
-                        </Badge>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => setNoteToSign(n.id)}>
-                          Assinar Prontuário
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handlePrintNote(n)}>
+                          <Printer className="w-4 h-4 mr-2" /> PDF
                         </Button>
-                      )}
+                        {n.is_signed ? (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
+                          >
+                            <Check className="w-3 h-3" /> Assinado
+                          </Badge>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => setNoteToSign(n.id)}>
+                            Assinar Prontuário
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90">
                       {n.content}
                     </p>
                     {n.is_signed && n.signature_hash && (
                       <p className="mt-4 text-xs text-muted-foreground font-mono">
-                        Hash: {n.signature_hash}
+                        Assinado em: {new Date(n.signed_at).toLocaleString()} • Hash:{' '}
+                        {n.signature_hash}
                       </p>
                     )}
                   </div>
@@ -562,6 +578,7 @@ export default function PatientRecord() {
 
       {/* Print Only Section */}
       <div className="hidden print:block w-full bg-white text-black text-sm">
+        {/* Clinic Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
           <div className="flex items-center gap-4">
             {clinicSettings?.logo ? (
@@ -589,103 +606,155 @@ export default function PatientRecord() {
             </div>
           </div>
           <div className="text-right text-gray-600 flex flex-col justify-end">
-            <span className="font-semibold text-black uppercase mb-1">Resumo Clínico</span>
-            <span>Gerado em: {new Date().toLocaleDateString()}</span>
+            <span className="font-semibold text-black uppercase mb-1">
+              {noteToPrint ? 'Prontuário Médico' : 'Ficha Completa'}
+            </span>
+            <span>Emitido em: {new Date().toLocaleDateString()}</span>
           </div>
         </div>
 
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
-            Identificação do Paciente
-          </h2>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-4 p-2">
-            <div>
-              <strong>Nome:</strong> {data.patient.name}
-            </div>
-            <div>
-              <strong>Documento:</strong> {data.patient.document || '-'}
-            </div>
-            <div>
-              <strong>Data de Nasc.:</strong>{' '}
-              {data.patient.dob ? new Date(data.patient.dob).toLocaleDateString() : '-'}
-            </div>
-            <div>
-              <strong>Gênero:</strong> {data.patient.gender || '-'}
-            </div>
-            {data.patient.email && (
+        {noteToPrint ? (
+          /* Single Note Print Layout */
+          <div>
+            <div className="mb-6 bg-gray-100 p-4 rounded grid grid-cols-2 gap-4">
               <div>
-                <strong>Email:</strong> {data.patient.email}
+                <strong>Paciente:</strong> {data.patient.name}
               </div>
-            )}
-            {data.patient.phone && (
               <div>
-                <strong>Telefone:</strong> {data.patient.phone}
+                <strong>Documento:</strong> {data.patient.document || '-'}
+              </div>
+              <div>
+                <strong>Data do Registro:</strong>{' '}
+                {new Date(noteToPrint.created).toLocaleDateString()}
+              </div>
+              <div>
+                <strong>Profissional:</strong>{' '}
+                {users.find((u) => u.id === noteToPrint.professionalId)?.name ||
+                  noteToPrint.professionalId ||
+                  'Clínica'}
+              </div>
+            </div>
+            <div className="mb-8 min-h-[300px]">
+              <h3 className="font-bold mb-4 uppercase border-b border-gray-300 pb-2 text-lg">
+                Conteúdo Clínico
+              </h3>
+              <p className="whitespace-pre-wrap leading-relaxed text-base">{noteToPrint.content}</p>
+            </div>
+            {noteToPrint.is_signed && (
+              <div className="mt-12 pt-6 border-t border-gray-400 text-center max-w-md mx-auto">
+                <p className="font-bold text-lg mb-1">
+                  Assinado Digitalmente por{' '}
+                  {users.find((u) => u.id === noteToPrint.professionalId)?.name || 'Profissional'}
+                </p>
+                <p className="text-sm text-gray-700">
+                  Data e Hora: {new Date(noteToPrint.signed_at).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 font-mono mt-2 break-all">
+                  Hash: {noteToPrint.signature_hash}
+                </p>
               </div>
             )}
           </div>
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
-            Mapeamento de Dor (Ativos)
-          </h2>
-          <table className="w-full border-collapse mt-2">
-            <thead>
-              <tr className="border-b-2 border-gray-300">
-                <th className="text-left p-2 font-bold w-1/4">Região</th>
-                <th className="text-left p-2 font-bold w-16">Nível</th>
-                <th className="text-left p-2 font-bold w-1/3">Patologias</th>
-                <th className="text-left p-2 font-bold">Notas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.points.map((pt: any) => (
-                <tr key={pt.id} className="border-b border-gray-200">
-                  <td className="p-2 font-medium">{pt.name || pt.view}</td>
-                  <td className="p-2 text-center">{pt.intensity}/10</td>
-                  <td className="p-2">{pt.pathologies?.join(', ') || '-'}</td>
-                  <td className="p-2 italic text-gray-700">{pt.notes || '-'}</td>
-                </tr>
-              ))}
-              {data.points.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center text-gray-500">
-                    Nenhum ponto de dor registrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
-            Evolução Clínica e Notas
-          </h2>
-          <div className="space-y-4 mt-2 p-2">
-            {data.notes.map((n: any) => (
-              <div key={n.id} className="pb-3 border-b border-dashed border-gray-300 last:border-0">
-                <div className="font-bold flex justify-between items-center">
-                  <span>
-                    {new Date(n.created).toLocaleDateString()} -{' '}
-                    {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
-                  </span>
-                  {n.is_signed && (
-                    <span className="text-xs font-normal text-gray-500">
-                      Assinado: {new Date(n.signed_at).toLocaleDateString()}
-                    </span>
-                  )}
+        ) : (
+          /* Full Record Print Layout */
+          <div>
+            <div className="mb-8">
+              <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
+                Identificação do Paciente
+              </h2>
+              <div className="grid grid-cols-2 gap-y-2 gap-x-4 p-2">
+                <div>
+                  <strong>Nome:</strong> {data.patient.name}
                 </div>
-                <p className="mt-1 text-gray-800 whitespace-pre-wrap">{n.content}</p>
+                <div>
+                  <strong>Documento:</strong> {data.patient.document || '-'}
+                </div>
+                <div>
+                  <strong>Data de Nasc.:</strong>{' '}
+                  {data.patient.dob ? new Date(data.patient.dob).toLocaleDateString() : '-'}
+                </div>
+                <div>
+                  <strong>Gênero:</strong> {data.patient.gender || '-'}
+                </div>
+                {data.patient.email && (
+                  <div>
+                    <strong>Email:</strong> {data.patient.email}
+                  </div>
+                )}
+                {data.patient.phone && (
+                  <div>
+                    <strong>Telefone:</strong> {data.patient.phone}
+                  </div>
+                )}
               </div>
-            ))}
-            {data.notes.length === 0 && (
-              <div className="text-gray-500 text-center py-4">
-                Nenhum registro clínico encontrado.
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
+                Mapeamento de Dor (Ativos)
+              </h2>
+              <table className="w-full border-collapse mt-2">
+                <thead>
+                  <tr className="border-b-2 border-gray-300">
+                    <th className="text-left p-2 font-bold w-1/4">Região</th>
+                    <th className="text-left p-2 font-bold w-16">Nível</th>
+                    <th className="text-left p-2 font-bold w-1/3">Patologias</th>
+                    <th className="text-left p-2 font-bold">Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.points.map((pt: any) => (
+                    <tr key={pt.id} className="border-b border-gray-200">
+                      <td className="p-2 font-medium">{pt.name || pt.view}</td>
+                      <td className="p-2 text-center">{pt.intensity}/10</td>
+                      <td className="p-2">{pt.pathologies?.join(', ') || '-'}</td>
+                      <td className="p-2 italic text-gray-700">{pt.notes || '-'}</td>
+                    </tr>
+                  ))}
+                  {data.points.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-4 text-center text-gray-500">
+                        Nenhum ponto de dor registrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
+                Evolução Clínica e Notas
+              </h2>
+              <div className="space-y-4 mt-2 p-2">
+                {data.notes.map((n: any) => (
+                  <div
+                    key={n.id}
+                    className="pb-3 border-b border-dashed border-gray-300 last:border-0"
+                  >
+                    <div className="font-bold flex justify-between items-center">
+                      <span>
+                        {new Date(n.created).toLocaleDateString()} -{' '}
+                        {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
+                      </span>
+                      {n.is_signed && (
+                        <span className="text-xs font-normal text-gray-500">
+                          Assinado: {new Date(n.signed_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-gray-800 whitespace-pre-wrap">{n.content}</p>
+                  </div>
+                ))}
+                {data.notes.length === 0 && (
+                  <div className="text-gray-500 text-center py-4">
+                    Nenhum registro clínico encontrado.
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   )

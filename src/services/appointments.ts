@@ -8,6 +8,7 @@ export interface Appointment {
   end_time: string
   title: string
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+  specialty?: string
   notes?: string
   created: string
   updated: string

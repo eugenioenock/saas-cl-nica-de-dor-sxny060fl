@@ -53,6 +53,7 @@ const formSchema = z
     startTime: z.string().min(1, 'Início obrigatório'),
     endTime: z.string().min(1, 'Término obrigatório'),
     status: z.enum(['scheduled', 'confirmed', 'completed', 'cancelled']),
+    specialty: z.string().optional(),
     notes: z.string().optional(),
   })
   .refine(
@@ -103,6 +104,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
         startTime: format(s, 'HH:mm'),
         endTime: format(e, 'HH:mm'),
         status: appointment.status,
+        specialty: appointment.specialty || '',
         notes: appointment.notes || '',
       })
     } else {
@@ -114,6 +116,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
         startTime: '09:00',
         endTime: '10:00',
         status: 'scheduled',
+        specialty: '',
         notes: '',
       })
     }
@@ -127,6 +130,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
         professional_id: v.professional_id,
         title: v.title,
         status: v.status,
+        specialty: v.specialty,
         notes: v.notes,
         start_time: new Date(`${v.date}T${v.startTime}`).toISOString(),
         end_time: new Date(`${v.date}T${v.endTime}`).toISOString(),
@@ -363,6 +367,20 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="specialty"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Especialidade</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ex: Fisioterapia, Ortopedia" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
