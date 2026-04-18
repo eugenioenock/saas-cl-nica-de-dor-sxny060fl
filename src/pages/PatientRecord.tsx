@@ -59,10 +59,17 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
+import { Package } from 'lucide-react'
 
 export default function PatientRecord() {
   const { id } = useParams()
-  const [data, setData] = useState<any>({ patient: null, points: [], notes: [], catalog: [] })
+  const [data, setData] = useState<any>({
+    patient: null,
+    points: [],
+    notes: [],
+    catalog: [],
+    usages: [],
+  })
   const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,6 +90,17 @@ export default function PatientRecord() {
   const [noteToSign, setNoteToSign] = useState<string | null>(null)
   const [noteToPrint, setNoteToPrint] = useState<any | null>(null)
 
+  const [usageModalOpen, setUsageModalOpen] = useState(false)
+  const [inventoryItems, setInventoryItems] = useState<any[]>([])
+  const [batchItems, setBatchItems] = useState<any[]>([])
+  const [usageForm, setUsageForm] = useState({
+    material_id: '',
+    batch_id: '',
+    quantity_used: '',
+    notes: '',
+  })
+  const [isSubmittingUsage, setIsSubmittingUsage] = useState(false)
+
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
     if (intensity >= 5) return 'bg-orange-500 hover:bg-orange-600 text-white'
@@ -92,7 +110,17 @@ export default function PatientRecord() {
   const load = async () => {
     if (!id) return
     try {
-      const [patient, points, notes, catalog, settingsRes, usersRes] = await Promise.all([
+      const [
+        patient,
+        points,
+        notes,
+        catalog,
+        settingsRes,
+        usersRes,
+        usagesRes,
+        inventoryRes,
+        batchesRes,
+      ] = await Promise.all([
         pb.collection('patients').getOne(id!),
         pb
           .collection('pain_points')
@@ -106,9 +134,22 @@ export default function PatientRecord() {
           .getList(1, 1)
           .catch(() => null),
         pb.collection('users').getFullList(),
+        pb
+          .collection('inventory_usage')
+          .getFullList({
+            filter: `patient_id="${id}"`,
+            expand: 'batch_id,batch_id.material_id,professional_id',
+            sort: '-usage_date',
+          }),
+        pb.collection('clinical_inventory').getFullList({ sort: 'name' }),
+        pb
+          .collection('inventory_batches')
+          .getFullList({ filter: 'current_quantity > 0', sort: 'expiry_date' }),
       ])
-      setData({ patient, points, notes, catalog: catalog.map((c) => c.name) })
+      setData({ patient, points, notes, catalog: catalog.map((c) => c.name), usages: usagesRes })
       setUsers(usersRes)
+      setInventoryItems(inventoryRes)
+      setBatchItems(batchesRes)
       if (settingsRes && settingsRes.items.length > 0) {
         setClinicSettings(settingsRes.items[0])
       }
@@ -125,6 +166,29 @@ export default function PatientRecord() {
   useRealtime('pain_points', load)
   useRealtime('medical_notes', load)
   useRealtime('pathologies_catalog', load)
+  useRealtime('inventory_usage', load)
+
+  const saveUsage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingUsage(true)
+    try {
+      await pb.collection('inventory_usage').create({
+        batch_id: usageForm.batch_id,
+        patient_id: id,
+        quantity_used: parseFloat(usageForm.quantity_used),
+        professional_id: pb.authStore.record?.id,
+        usage_date: new Date().toISOString(),
+        notes: usageForm.notes,
+      })
+      toast.success('Uso registrado com sucesso!')
+      setUsageModalOpen(false)
+      setUsageForm({ material_id: '', batch_id: '', quantity_used: '', notes: '' })
+    } catch (err) {
+      toast.error('Erro ao registrar uso')
+    } finally {
+      setIsSubmittingUsage(false)
+    }
+  }
 
   const save = async () => {
     try {
@@ -242,6 +306,7 @@ export default function PatientRecord() {
             <TabsTrigger value="map">Mapa de Dor</TabsTrigger>
             <TabsTrigger value="notes">Histórico Clínico</TabsTrigger>
             <TabsTrigger value="evolution">Evolução</TabsTrigger>
+            <TabsTrigger value="inventory">Materiais Utilizados</TabsTrigger>
           </TabsList>
 
           <TabsContent value="map" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
@@ -404,6 +469,65 @@ export default function PatientRecord() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="inventory" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row justify-between items-center">
+                <div>
+                  <CardTitle>Materiais Utilizados</CardTitle>
+                  <CardDescription>Histórico de consumo e rastreabilidade de lotes</CardDescription>
+                </div>
+                <Button onClick={() => setUsageModalOpen(true)}>
+                  <Package className="mr-2 h-4 w-4" /> Registrar Uso
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {data.usages && data.usages.length > 0 ? (
+                  <div className="space-y-4">
+                    {data.usages.map((u: any) => (
+                      <div
+                        key={u.id}
+                        className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-primary">
+                              {u.expand?.batch_id?.expand?.material_id?.name ||
+                                'Material Desconhecido'}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Lote:{' '}
+                              <span className="font-mono">{u.expand?.batch_id?.batch_number}</span>
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Quantidade:{' '}
+                              <strong>
+                                {u.quantity_used} {u.expand?.batch_id?.expand?.material_id?.unit}
+                              </strong>
+                            </p>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            <p>{new Date(u.usage_date).toLocaleDateString()}</p>
+                            <p>
+                              Profissional:{' '}
+                              {u.expand?.professional_id?.name || u.expand?.professional_id?.email}
+                            </p>
+                          </div>
+                        </div>
+                        {u.notes && (
+                          <p className="text-sm mt-3 italic text-muted-foreground">"{u.notes}"</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum material registrado para este paciente.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="evolution" className="mt-4">
             <Card>
               <CardHeader>
@@ -556,6 +680,82 @@ export default function PatientRecord() {
             <DialogFooter>
               <Button onClick={save}>Salvar</Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={usageModalOpen} onOpenChange={setUsageModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Uso de Material</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={saveUsage} className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>Material</Label>
+                <Select
+                  value={usageForm.material_id}
+                  onValueChange={(v) =>
+                    setUsageForm({ ...usageForm, material_id: v, batch_id: '' })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o material" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryItems.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Lote</Label>
+                <Select
+                  value={usageForm.batch_id}
+                  onValueChange={(v) => setUsageForm({ ...usageForm, batch_id: v })}
+                  disabled={!usageForm.material_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o lote (com estoque)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {batchItems
+                      .filter((b) => b.material_id === usageForm.material_id)
+                      .map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.batch_number} (Disp: {b.current_quantity}) - Val:{' '}
+                          {new Date(b.expiry_date).toLocaleDateString()}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Quantidade Utilizada</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={usageForm.quantity_used}
+                  onChange={(e) => setUsageForm({ ...usageForm, quantity_used: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Observações (Opcional)</Label>
+                <Input
+                  value={usageForm.notes}
+                  onChange={(e) => setUsageForm({ ...usageForm, notes: e.target.value })}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isSubmittingUsage || !usageForm.batch_id}>
+                  {isSubmittingUsage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar Uso
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 
