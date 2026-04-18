@@ -8,7 +8,7 @@ import Index from './pages/Index'
 import Patients from './pages/Patients'
 import PatientRecord from './pages/PatientRecord'
 import Inventory from './pages/Inventory'
-import Finance from './pages/Finance'
+import Financeiro from './pages/Financeiro'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
@@ -57,7 +57,7 @@ const App = () => (
               <Route path="/pacientes/:id" element={<PatientRecord />} />
               <Route path="/records" element={<RecordsRedirect />} />
               <Route path="/inventory" element={<Inventory />} />
-              <Route path="/finance" element={<Finance />} />
+              <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/insurance" element={<Insurance />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />

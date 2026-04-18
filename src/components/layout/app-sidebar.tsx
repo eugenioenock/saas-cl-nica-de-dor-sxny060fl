@@ -31,7 +31,7 @@ const adminNavItems = [
   { title: 'Pacientes', icon: Users, url: '/pacientes' },
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
-  { title: 'Financeiro', icon: DollarSign, url: '/finance' },
+  { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
   { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },
 ]
