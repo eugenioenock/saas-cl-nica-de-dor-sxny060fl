@@ -1,23 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Users,
-  Calendar,
-  AlertTriangle,
-  DollarSign,
-  Activity,
-  Bell,
-  Plus,
-  Undo2,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DollarSign, Activity, TrendingUp } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
-import { Link } from 'react-router-dom'
-import { AppointmentSheet } from '@/components/agenda/appointment-sheet'
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Cell } from 'recharts'
+import { format, isSameMonth, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import {
   ChartContainer,
   ChartTooltip,
@@ -25,130 +12,18 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from '@/components/ui/chart'
-
-const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-]
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
 
 export default function Index() {
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [totalPatients, setTotalPatients] = useState(0)
-  const [todayAppointments, setTodayAppointments] = useState<any[]>([])
-  const [criticalPatients, setCriticalPatients] = useState<any[]>([])
-  const [revenue, setRevenue] = useState(0)
-  const [pending, setPending] = useState(0)
-  const [pendingReturns, setPendingReturns] = useState(0)
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
-  const [needsFollowUp, setNeedsFollowUp] = useState<any[]>([])
-  const [monthlyVolume, setMonthlyVolume] = useState<any[]>([])
-  const [specialtyDistribution, setSpecialtyDistribution] = useState<any[]>([])
+  const [finances, setFinances] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
     try {
-      const patientsRes = await pb.collection('patients').getFullList({ sort: '-created' })
-      setTotalPatients(patientsRes.length)
-
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      const end = new Date()
-      end.setHours(23, 59, 59, 999)
-      const appts = await pb.collection('appointments').getFullList({
-        filter: `start_time >= "${start.toISOString().replace('T', ' ')}" && start_time <= "${end.toISOString().replace('T', ' ')}"`,
-        expand: 'patient_id,professional_id',
-        sort: 'start_time',
-      })
-      setTodayAppointments(appts)
-
-      const critical = await pb
-        .collection('pain_points')
-        .getList(1, 50, { filter: 'intensity >= 8', sort: '-created', expand: 'patient_id' })
-      const seen = new Set()
-      const dedupedCritical = []
-      for (const pt of critical.items) {
-        if (!seen.has(pt.patient_id)) {
-          seen.add(pt.patient_id)
-          dedupedCritical.push(pt)
-        }
-      }
-      setCriticalPatients(dedupedCritical)
-
-      const finances = await pb
-        .collection('consultations_finance')
-        .getFullList({ expand: 'patient_id', sort: '-created' })
-      setRevenue(finances.filter((f) => f.status === 'paid').reduce((a, f) => a + f.amount, 0))
-      setPending(finances.filter((f) => f.status === 'pending').reduce((a, f) => a + f.amount, 0))
-      setRecentTransactions(finances.slice(0, 5))
-
-      const allAppointments = await pb.collection('appointments').getFullList()
-      const now = new Date()
-      const patientsWithCompletedPast = new Set()
-      const patientsWithFuture = new Set()
-
-      const currentYear = now.getFullYear()
-      const months = [
-        'Jan',
-        'Fev',
-        'Mar',
-        'Abr',
-        'Mai',
-        'Jun',
-        'Jul',
-        'Ago',
-        'Set',
-        'Out',
-        'Nov',
-        'Dez',
-      ]
-      const monthlyMap = Array(12).fill(0)
-      const specMap: Record<string, number> = {}
-
-      for (const apt of allAppointments) {
-        const aptDate = new Date(apt.start_time)
-        if (apt.status === 'completed' && aptDate < now) {
-          patientsWithCompletedPast.add(apt.patient_id)
-        }
-        if ((apt.status === 'scheduled' || apt.status === 'confirmed') && aptDate >= now) {
-          patientsWithFuture.add(apt.patient_id)
-        }
-
-        // Analytics
-        if (aptDate.getFullYear() === currentYear) {
-          monthlyMap[aptDate.getMonth()]++
-        }
-        const spec = apt.specialty || 'Geral'
-        specMap[spec] = (specMap[spec] || 0) + 1
-      }
-
-      setMonthlyVolume(months.map((month, i) => ({ month, count: monthlyMap[i] })))
-      setSpecialtyDistribution(
-        Object.entries(specMap)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5),
-      )
-
-      let pendingReturnsCount = 0
-      for (const pid of patientsWithCompletedPast) {
-        if (!patientsWithFuture.has(pid)) {
-          pendingReturnsCount++
-        }
-      }
-      setPendingReturns(pendingReturnsCount)
-
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      const recentNotes = await pb
-        .collection('medical_notes')
-        .getFullList({ filter: `created >= "${thirtyDaysAgo.toISOString().replace('T', ' ')}"` })
-      const activeIds = new Set(recentNotes.map((n) => n.patient_id))
-      setNeedsFollowUp(patientsRes.filter((p) => !activeIds.has(p.id)))
-    } catch (error) {
-      console.error(error)
+      const records = await pb.collection('consultations_finance').getFullList({ sort: '-created' })
+      setFinances(records)
+    } catch (err) {
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -157,215 +32,196 @@ export default function Index() {
   useEffect(() => {
     loadData()
   }, [])
-  useRealtime('patients', loadData)
-  useRealtime('appointments', loadData)
-  useRealtime('medical_notes', loadData)
-  useRealtime('pain_points', loadData)
   useRealtime('consultations_finance', loadData)
 
-  const volumeChartConfig = {
-    count: { label: 'Agendamentos', color: 'hsl(var(--primary))' },
+  const now = new Date()
+
+  const currentMonthPaid = finances
+    .filter(
+      (f) =>
+        f.status === 'paid' &&
+        (f.due_date
+          ? isSameMonth(parseISO(f.due_date), now)
+          : isSameMonth(parseISO(f.created), now)),
+    )
+    .reduce((sum, f) => sum + f.amount, 0)
+
+  const pendingAmount = finances
+    .filter((f) => f.status === 'pending')
+    .reduce((sum, f) => sum + f.amount, 0)
+
+  const revenuePrediction = finances
+    .filter(
+      (f) =>
+        (f.status === 'paid' || f.status === 'pending') &&
+        (f.due_date
+          ? isSameMonth(parseISO(f.due_date), now)
+          : isSameMonth(parseISO(f.created), now)),
+    )
+    .reduce((sum, f) => sum + f.amount, 0)
+
+  const monthlyDataMap = finances.reduce(
+    (acc, f) => {
+      if (f.status === 'cancelled') return acc
+      const date = f.due_date ? parseISO(f.due_date) : parseISO(f.created)
+      const month = format(date, 'MMM/yy', { locale: ptBR })
+      if (!acc[month]) acc[month] = { month, paid: 0, pending: 0 }
+      if (f.status === 'paid') acc[month].paid += f.amount
+      else if (f.status === 'pending') acc[month].pending += f.amount
+      return acc
+    },
+    {} as Record<string, any>,
+  )
+
+  const monthlyData = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const month = format(d, 'MMM/yy', { locale: ptBR })
+    monthlyData.push(monthlyDataMap[month] || { month, paid: 0, pending: 0 })
   }
 
-  const specialtyChartConfig = {
-    value: { label: 'Especialidade' },
-    ...Object.fromEntries(
-      specialtyDistribution.map((s, i) => [
-        s.name,
-        { label: s.name, color: COLORS[i % COLORS.length] },
-      ]),
-    ),
-  }
+  const paymentMethodsMap = finances.reduce(
+    (acc, f) => {
+      if (f.status === 'paid') {
+        const method = f.payment_method || 'unknown'
+        acc[method] = (acc[method] || 0) + f.amount
+      }
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const paymentMethodsData = Object.entries(paymentMethodsMap).map(([name, value]) => ({
+    name:
+      name === 'pix'
+        ? 'PIX'
+        : name === 'card'
+          ? 'Cartão'
+          : name === 'cash'
+            ? 'Dinheiro'
+            : name === 'transfer'
+              ? 'Transferência'
+              : 'Outro',
+    value,
+  }))
+
+  const COLORS = [
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+  ]
+
+  const paymentChartConfig = paymentMethodsData.reduce(
+    (acc, d, i) => {
+      acc[d.name] = { label: d.name, color: COLORS[i % COLORS.length] }
+      return acc
+    },
+    {} as Record<string, any>,
+  )
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
-          <p className="text-muted-foreground">Resumo geral de atividades e finanças.</p>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Novo Agendamento
-        </Button>
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard Financeiro</h1>
+        <p className="text-muted-foreground">Acompanhe a saúde financeira da clínica.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : totalPatients}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Agendamentos Hoje</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : todayAppointments.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita (Paga)</CardTitle>
+            <CardTitle className="text-sm font-medium">Faturamento Pago (Mês Atual)</CardTitle>
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              R$ {loading ? '-' : revenue.toFixed(2)}
+              R$ {currentMonthPaid.toFixed(2)}
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">A Receber (Pendente)</CardTitle>
-            <Activity className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium">Recebimentos Pendentes</CardTitle>
+            <Activity className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">
-              R$ {loading ? '-' : pending.toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold text-orange-600">R$ {pendingAmount.toFixed(2)}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retornos Pendentes</CardTitle>
-            <Undo2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Previsão de Receita (Mês Atual)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : pendingReturns}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              R$ {revenuePrediction.toFixed(2)}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" /> Alertas Críticos (Dor ≥ 8)
-            </CardTitle>
+            <CardTitle>Receita Mensal</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[250px]">
-              <div className="space-y-4 pr-4">
-                {criticalPatients.map((pt) => (
-                  <Link
-                    key={pt.id}
-                    to={`/pacientes/${pt.patient_id}`}
-                    className="flex justify-between items-center border-b pb-2 last:border-0 hover:bg-muted p-2 rounded -mx-2"
-                  >
-                    <div>
-                      <p className="text-sm font-medium hover:underline">
-                        {pt.expand?.patient_id?.name || 'Desconhecido'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(pt.created).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge variant="destructive">Nível {pt.intensity}</Badge>
-                  </Link>
-                ))}
-                {!loading && criticalPatients.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Sem alertas críticos.</p>
-                )}
-              </div>
-            </ScrollArea>
+            <ChartContainer
+              config={{
+                paid: { label: 'Pago', color: 'hsl(var(--chart-1))' },
+                pending: { label: 'Pendente', color: 'hsl(var(--chart-2))' },
+              }}
+              className="h-[300px] w-full"
+            >
+              <BarChart data={monthlyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `R$ ${value}`} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar dataKey="paid" fill="var(--color-paid)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="pending" fill="var(--color-pending)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="col-span-3">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-blue-500" /> Necessita Retorno (30+ dias)
-            </CardTitle>
-            <CardDescription>Pacientes sem prontuário recente.</CardDescription>
+            <CardTitle>Métodos de Pagamento (Pagos)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[250px]">
-              <div className="space-y-4 pr-4">
-                {needsFollowUp.map((pt) => (
-                  <div
-                    key={pt.id}
-                    className="flex justify-between items-center border-b pb-2 last:border-0"
+          <CardContent className="flex justify-center items-center h-[300px]">
+            {paymentMethodsData.length > 0 ? (
+              <ChartContainer config={paymentChartConfig} className="h-full w-full">
+                <PieChart>
+                  <Pie
+                    data={paymentMethodsData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
                   >
-                    <p className="text-sm font-medium">{pt.name}</p>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/pacientes/${pt.id}`}>Ver</Link>
-                    </Button>
-                  </div>
-                ))}
-                {!loading && needsFollowUp.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Todos os pacientes estão atualizados.
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Analytics Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Volume de Agendamentos ({new Date().getFullYear()})</CardTitle>
-            <CardDescription>Histórico mensal de consultas.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ChartContainer config={volumeChartConfig} className="w-full h-full">
-                <BarChart
-                  data={monthlyVolume}
-                  margin={{ top: 20, right: 20, bottom: 0, left: -20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                    {paymentMethodsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip
+                    content={<ChartTooltipContent valueFormatter={(v) => `R$ ${v}`} />}
+                  />
+                  <ChartLegend content={<ChartLegendContent />} className="flex-wrap" />
+                </PieChart>
               </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuição por Especialidade</CardTitle>
-            <CardDescription>Especialidades mais frequentes nas consultas.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {specialtyDistribution.length > 0 ? (
-                <ChartContainer config={specialtyChartConfig} className="w-full h-full">
-                  <PieChart>
-                    <Pie
-                      data={specialtyDistribution}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {specialtyDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} className="flex-wrap" />
-                  </PieChart>
-                </ChartContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  Sem dados suficientes.
-                </div>
-              )}
-            </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Nenhum dado de pagamento pago disponível.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

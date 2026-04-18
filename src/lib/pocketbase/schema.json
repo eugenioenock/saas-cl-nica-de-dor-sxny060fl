@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T00:30:48.025Z",
+  "generatedAt": "2026-04-18T00:34:15.242Z",
   "collections": [
     {
       "name": "users",
@@ -509,6 +509,59 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_appointments_start ON appointments (start_time)"]
+    },
+    {
+      "name": "clinical_inventory",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "current_quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "min_quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["un", "ml", "cx", "pct"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

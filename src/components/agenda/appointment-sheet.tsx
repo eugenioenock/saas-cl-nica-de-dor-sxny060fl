@@ -397,13 +397,46 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
             />
 
             <div className="flex justify-between pt-4">
-              {appointment ? (
-                <Button type="button" variant="destructive" onClick={handleDelete}>
-                  Excluir
-                </Button>
-              ) : (
-                <span />
-              )}
+              <div className="flex gap-2">
+                {appointment ? (
+                  <>
+                    <Button type="button" variant="destructive" onClick={handleDelete}>
+                      Excluir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
+                      onClick={() => {
+                        const patientId = form.getValues('patient_id')
+                        const patient = patients.find((p) => p.id === patientId)
+                        if (!patient || !patient.phone) {
+                          toast.error('Paciente não possui telefone cadastrado.')
+                          return
+                        }
+                        const prof = users.find((u) => u.id === form.getValues('professional_id'))
+                        const profName = prof?.name || prof?.email || 'o profissional'
+                        const dateStr = format(
+                          new Date(`${form.getValues('date')}T${form.getValues('startTime')}`),
+                          'dd/MM/yyyy',
+                        )
+                        const timeStr = form.getValues('startTime')
+
+                        const msg = `Olá ${patient.name}, confirmamos sua consulta com ${profName} no dia ${dateStr} às ${timeStr}. Podemos confirmar sua presença?`
+                        const phone = patient.phone.replace(/\D/g, '')
+                        window.open(
+                          `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
+                          '_blank',
+                        )
+                      }}
+                    >
+                      WhatsApp
+                    </Button>
+                  </>
+                ) : (
+                  <span />
+                )}
+              </div>
               <Button type="submit" disabled={saving}>
                 {saving ? 'Salvando...' : 'Salvar'}
               </Button>
