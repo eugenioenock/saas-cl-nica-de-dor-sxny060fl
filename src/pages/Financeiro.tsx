@@ -65,7 +65,7 @@ export default function Financeiro() {
     try {
       const records = await pb
         .collection('consultations_finance')
-        .getFullList({ expand: 'patient_id,insurance_plan_id' })
+        .getFullList({ expand: 'patient_id,insurance_plan_id,medical_note_id' })
       setFinances(records)
       const [pts, pls, s] = await Promise.all([
         pb.collection('patients').getFullList({ sort: 'name' }),
@@ -314,16 +314,34 @@ export default function Financeiro() {
                     <TableCell>{new Date(f.due_date || f.created).toLocaleDateString()}</TableCell>
                     <TableCell className="font-medium">{f.expand?.patient_id?.name}</TableCell>
                     <TableCell>
-                      {f.billing_type === 'insurance' ? (
-                        <div className="text-sm">
-                          <span className="font-semibold text-blue-600">Convênio</span>
-                          <div className="text-xs text-muted-foreground">
-                            {f.expand?.insurance_plan_id?.name}
+                      <div className="flex flex-col gap-1">
+                        {f.billing_type === 'insurance' ? (
+                          <div className="text-sm">
+                            <span className="font-semibold text-blue-600">Convênio</span>
+                            <div className="text-xs text-muted-foreground">
+                              {f.expand?.insurance_plan_id?.name}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="text-sm capitalize">{f.payment_method}</div>
-                      )}
+                        ) : (
+                          <div className="text-sm capitalize">
+                            {f.payment_method === 'pix'
+                              ? 'PIX'
+                              : f.payment_method === 'cash'
+                                ? 'Dinheiro'
+                                : f.payment_method === 'card'
+                                  ? 'Cartão'
+                                  : 'Transferência'}
+                          </div>
+                        )}
+                        {f.expand?.medical_note_id && (
+                          <div
+                            className="text-xs text-muted-foreground truncate max-w-[200px]"
+                            title={f.expand.medical_note_id.content}
+                          >
+                            Proc: {f.expand.medical_note_id.content}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(f.status)}</TableCell>
                     <TableCell className="text-right font-medium">

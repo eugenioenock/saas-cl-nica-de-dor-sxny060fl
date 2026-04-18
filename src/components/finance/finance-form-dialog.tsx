@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -28,9 +28,11 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [medicalNotes, setMedicalNotes] = useState<any[]>([])
 
   const initialForm = {
     patient_id: '',
+    medical_note_id: '',
     amount: '',
     status: 'pending',
     payment_method: 'pix',
@@ -40,10 +42,49 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
   }
   const [formData, setFormData] = useState(initialForm)
 
+  useEffect(() => {
+    if (formData.patient_id) {
+      pb.collection('medical_notes')
+        .getFullList({
+          filter: `patient_id = "${formData.patient_id}"`,
+          sort: '-created',
+        })
+        .then(setMedicalNotes)
+        .catch(console.error)
+    } else {
+      setMedicalNotes([])
+      setFormData((prev) => ({ ...prev, medical_note_id: '' }))
+    }
+  }, [formData.patient_id])
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setFieldErrors({})
+
+    let hasErrors = false
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.patient_id) {
+      newErrors.patient_id = 'Paciente é obrigatório'
+      hasErrors = true
+    }
+
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      newErrors.amount = 'Valor inválido'
+      hasErrors = true
+    }
+
+    if (formData.billing_type === 'insurance' && !formData.insurance_plan_id) {
+      newErrors.insurance_plan_id = 'Convênio é obrigatório'
+      hasErrors = true
+    }
+
+    if (hasErrors) {
+      setFieldErrors(newErrors)
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       const payload = {
@@ -52,6 +93,11 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
         due_date: formData.due_date
           ? new Date(formData.due_date).toISOString().replace('T', ' ')
           : '',
+        medical_note_id:
+          formData.medical_note_id && formData.medical_note_id !== 'none'
+            ? formData.medical_note_id
+            : null,
+        insurance_plan_id: formData.insurance_plan_id || null,
       }
       await pb.collection('consultations_finance').create(payload)
       setIsOpen(false)
@@ -65,18 +111,86 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open)
+        if (!open) {
+          setFormData(initialForm)
+          setFieldErrors({})
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
-          <Plus className="mr-2 h-4 w-4" /> Novo Registro
+          <Plus className="mr-2 h-4 w-4" /> Novo Lançamento
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Novo Registro Financeiro</DialogTitle>
+          <DialogTitle>Novo Lançamento Financeiro</DialogTitle>
           <DialogDescription>Adicione uma nova cobrança ou pagamento.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSave} className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Paciente *</Label>
+              <Select
+                value={formData.patient_id}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, patient_id: v, medical_note_id: 'none' })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.patient_id && (
+                <span className="text-xs text-destructive">{fieldErrors.patient_id}</span>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Procedimento / Evolução</Label>
+              <Select
+                value={formData.medical_note_id || 'none'}
+                onValueChange={(v) => setFormData({ ...formData, medical_note_id: v })}
+                disabled={!formData.patient_id}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      !formData.patient_id
+                        ? 'Selecione o paciente primeiro'
+                        : medicalNotes.length === 0
+                          ? 'Nenhum procedimento encontrado'
+                          : 'Selecione um procedimento'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem procedimento vinculado</SelectItem>
+                  {medicalNotes.map((note) => (
+                    <SelectItem key={note.id} value={note.id}>
+                      {new Date(note.date || note.created).toLocaleDateString()} -{' '}
+                      {note.content ? note.content.substring(0, 30) + '...' : 'Sem descrição'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.medical_note_id && (
+                <span className="text-xs text-destructive">{fieldErrors.medical_note_id}</span>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Tipo de Faturamento</Label>
@@ -87,6 +201,7 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
                     ...formData,
                     billing_type: v,
                     payment_method: v === 'insurance' ? 'transfer' : 'pix',
+                    insurance_plan_id: v === 'private' ? '' : formData.insurance_plan_id,
                   })
                 }
               >
@@ -101,7 +216,7 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
             </div>
             {formData.billing_type === 'insurance' && (
               <div className="grid gap-2">
-                <Label>Convênio</Label>
+                <Label>Convênio *</Label>
                 <Select
                   value={formData.insurance_plan_id}
                   onValueChange={(v) => setFormData({ ...formData, insurance_plan_id: v })}
@@ -117,40 +232,27 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.insurance_plan_id && (
+                  <span className="text-xs text-destructive">{fieldErrors.insurance_plan_id}</span>
+                )}
               </div>
             )}
           </div>
-          <div className="grid gap-2">
-            <Label>Paciente *</Label>
-            <Select
-              value={formData.patient_id}
-              onValueChange={(v) => setFormData({ ...formData, patient_id: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {fieldErrors.patient_id && (
-              <span className="text-xs text-destructive">{fieldErrors.patient_id}</span>
-            )}
-          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Valor (R$) *</Label>
               <Input
                 type="number"
                 step="0.01"
+                min="0"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
               />
+              {fieldErrors.amount && (
+                <span className="text-xs text-destructive">{fieldErrors.amount}</span>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Status *</Label>
@@ -201,7 +303,7 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Salvar
+              Salvar Lançamento
             </Button>
           </DialogFooter>
         </form>
