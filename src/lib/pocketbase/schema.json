@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T03:45:07.513Z",
+  "generatedAt": "2026-04-18T16:58:34.988Z",
   "collections": [
     {
       "name": "users",
@@ -850,6 +850,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "medical_note_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "medical_notes"
         }
       ],
       "indexes": [

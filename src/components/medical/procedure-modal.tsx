@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 
 import { Appointment, mockUsers } from '@/lib/data'
 import { useAppContext } from '@/hooks/use-app-context'
+import pb from '@/lib/pocketbase/client'
+import { MaterialUsageSelector, MaterialUsage } from './material-usage-selector'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -39,6 +41,7 @@ const formSchema = z.object({
   date: z.string().min(1, 'A data é obrigatória'),
   professionalId: z.string().min(1, 'O profissional é obrigatório'),
   procedure: z.string().min(1, 'A descrição é obrigatória'),
+  materials: z.array(z.any()).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -61,25 +64,50 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
     },
   })
 
-  function onSubmit(values: FormValues) {
-    const newProcedure: Appointment = {
-      id: `new-${Date.now()}`,
-      clinicId: activeClinic.id,
-      patientId,
-      date: new Date(values.date).toISOString(),
-      status: 'completed',
-      procedure: values.procedure,
-      professionalId: values.professionalId,
+  async function onSubmit(values: FormValues) {
+    try {
+      const appointment = await pb.collection('appointments').create({
+        patient_id: patientId,
+        professional_id: values.professionalId,
+        start_time: new Date(values.date).toISOString(),
+        end_time: new Date(new Date(values.date).getTime() + 30 * 60000).toISOString(),
+        title: 'Procedimento Realizado',
+        status: 'completed',
+        notes: values.procedure,
+      })
+
+      const materials = values.materials as MaterialUsage[] | undefined
+      if (materials && materials.length > 0) {
+        for (const mat of materials) {
+          await pb.collection('inventory_usage').create({
+            batch_id: mat.batchId,
+            patient_id: patientId,
+            appointment_id: appointment.id,
+            quantity_used: mat.quantity,
+            professional_id: values.professionalId,
+            usage_date: new Date(values.date).toISOString(),
+          })
+        }
+      }
+
+      const newProcedure: Appointment = {
+        id: appointment.id,
+        clinicId: activeClinic.id,
+        patientId,
+        date: appointment.start_time,
+        status: 'completed',
+        procedure: values.procedure,
+        professionalId: values.professionalId,
+      }
+
+      onAdd(newProcedure)
+      setOpen(false)
+      form.reset()
+      toast.success('Procedimento e materiais registrados com sucesso!')
+    } catch (error) {
+      console.error(error)
+      toast.error('Erro ao salvar procedimento e materiais no banco de dados.')
     }
-
-    onAdd(newProcedure)
-    setOpen(false)
-    form.reset()
-
-    toast.success('Procedimento adicionado com sucesso', {
-      description:
-        'Nota: Os dados estão em memória e serão perdidos ao recarregar a página até a integração com o banco.',
-    })
   }
 
   const professionals = mockUsers.filter((u) => u.clinicId === activeClinic.id)
@@ -151,6 +179,18 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
                       className="min-h-[100px] resize-none"
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="materials"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <MaterialUsageSelector value={field.value || []} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
