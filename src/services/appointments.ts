@@ -3,6 +3,7 @@ import pb from '@/lib/pocketbase/client'
 export interface Appointment {
   id: string
   patient_id: string
+  professional_id: string
   start_time: string
   end_time: string
   title: string
@@ -12,13 +13,14 @@ export interface Appointment {
   updated: string
   expand?: {
     patient_id: { name: string; id: string }
+    professional_id: { name: string; id: string; email: string }
   }
 }
 
 export const getAppointments = (start: string, end: string) =>
   pb.collection('appointments').getFullList<Appointment>({
     filter: `start_time >= "${start}" && start_time <= "${end}"`,
-    expand: 'patient_id',
+    expand: 'patient_id,professional_id',
     sort: 'start_time',
   })
 

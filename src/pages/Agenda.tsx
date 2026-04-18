@@ -121,6 +121,11 @@ export default function AgendaPage() {
                     {format(new Date(appt.start_time), 'HH:mm')}
                   </span>{' '}
                   - {appt.title}
+                  {appt.expand?.professional_id?.name && (
+                    <div className="text-[9px] opacity-80 truncate mt-0.5">
+                      {appt.expand.professional_id.name}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

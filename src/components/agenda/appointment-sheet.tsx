@@ -35,6 +35,8 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { getPatients, type Patient } from '@/services/patients'
+import { getUsers, type User } from '@/services/users'
+import { useAuth } from '@/hooks/use-auth'
 import {
   createAppointment,
   updateAppointment,
@@ -45,6 +47,7 @@ import {
 const formSchema = z
   .object({
     patient_id: z.string().min(1, 'Selecione um paciente'),
+    professional_id: z.string().min(1, 'Selecione um profissional'),
     title: z.string().min(1, 'Título obrigatório'),
     date: z.string().min(1, 'Data obrigatória'),
     startTime: z.string().min(1, 'Início obrigatório'),
@@ -68,17 +71,24 @@ interface Props {
 }
 
 export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment }: Props) {
+  const { user } = useAuth()
   const [patients, setPatients] = useState<Patient[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [openCb, setOpenCb] = useState(false)
+  const [openUserCb, setOpenUserCb] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({ resolver: zodResolver(formSchema) })
 
   useEffect(() => {
-    if (open)
+    if (open) {
       getPatients()
         .then(setPatients)
         .catch(() => {})
+      getUsers()
+        .then(setUsers)
+        .catch(() => {})
+    }
   }, [open])
 
   useEffect(() => {
@@ -87,6 +97,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
       const e = new Date(appointment.end_time)
       form.reset({
         patient_id: appointment.patient_id,
+        professional_id: appointment.professional_id,
         title: appointment.title,
         date: format(s, 'yyyy-MM-dd'),
         startTime: format(s, 'HH:mm'),
@@ -97,6 +108,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
     } else {
       form.reset({
         patient_id: '',
+        professional_id: user?.id || '',
         title: '',
         date: format(selectedDate, 'yyyy-MM-dd'),
         startTime: '09:00',
@@ -105,13 +117,14 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
         notes: '',
       })
     }
-  }, [appointment, selectedDate, form, open])
+  }, [appointment, selectedDate, form, open, user])
 
   const onSubmit = async (v: z.infer<typeof formSchema>) => {
     setSaving(true)
     try {
       const payload = {
         patient_id: v.patient_id,
+        professional_id: v.professional_id,
         title: v.title,
         status: v.status,
         notes: v.notes,
@@ -165,16 +178,18 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                             !field.value && 'text-muted-foreground',
                           )}
                         >
-                          {field.value
-                            ? patients.find((p) => p.id === field.value)?.name
-                            : 'Selecionar paciente'}
+                          <span className="truncate">
+                            {field.value
+                              ? patients.find((p) => p.id === field.value)?.name
+                              : 'Selecionar paciente'}
+                          </span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Buscar..." />
+                        <CommandInput placeholder="Buscar paciente..." />
                         <CommandList>
                           <CommandEmpty>Nenhum paciente encontrado.</CommandEmpty>
                           <CommandGroup>
@@ -205,6 +220,68 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="professional_id"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Profissional</FormLabel>
+                  <Popover open={openUserCb} onOpenChange={setOpenUserCb}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            'w-full justify-between',
+                            !field.value && 'text-muted-foreground',
+                          )}
+                        >
+                          <span className="truncate">
+                            {field.value
+                              ? users.find((u) => u.id === field.value)?.name ||
+                                users.find((u) => u.id === field.value)?.email
+                              : 'Selecionar profissional'}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar profissional..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhum profissional encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {users.map((u) => (
+                              <CommandItem
+                                key={u.id}
+                                value={u.name || u.email}
+                                onSelect={() => {
+                                  form.setValue('professional_id', u.id)
+                                  setOpenUserCb(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4',
+                                    u.id === field.value ? 'opacity-100' : 'opacity-0',
+                                  )}
+                                />
+                                {u.name || u.email}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="title"
@@ -212,12 +289,13 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 <FormItem>
                   <FormLabel>Título</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} placeholder="Ex: Consulta de Rotina" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -238,7 +316,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
@@ -256,6 +334,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 )}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -284,6 +363,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 )}
               />
             </div>
+
             <FormField
               control={form.control}
               name="notes"
@@ -297,6 +377,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
                 </FormItem>
               )}
             />
+
             <div className="flex justify-between pt-4">
               {appointment ? (
                 <Button type="button" variant="destructive" onClick={handleDelete}>

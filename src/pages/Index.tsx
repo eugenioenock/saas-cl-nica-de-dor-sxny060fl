@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Calendar, AlertTriangle, DollarSign, Activity, Bell } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, DollarSign, Activity, Bell, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Link } from 'react-router-dom'
+import { AppointmentSheet } from '@/components/agenda/appointment-sheet'
 
 export default function Index() {
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [totalPatients, setTotalPatients] = useState(0)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
   const [criticalPatients, setCriticalPatients] = useState<any[]>([])
@@ -27,12 +29,12 @@ export default function Index() {
       start.setHours(0, 0, 0, 0)
       const end = new Date()
       end.setHours(23, 59, 59, 999)
-      const notes = await pb.collection('medical_notes').getFullList({
-        filter: `date >= "${start.toISOString().replace('T', ' ')}" && date <= "${end.toISOString().replace('T', ' ')}"`,
-        expand: 'patient_id',
-        sort: 'date',
+      const appts = await pb.collection('appointments').getFullList({
+        filter: `start_time >= "${start.toISOString().replace('T', ' ')}" && start_time <= "${end.toISOString().replace('T', ' ')}"`,
+        expand: 'patient_id,professional_id',
+        sort: 'start_time',
       })
-      setTodayAppointments(notes)
+      setTodayAppointments(appts)
 
       const critical = await pb
         .collection('pain_points')
@@ -72,15 +74,21 @@ export default function Index() {
     loadData()
   }, [])
   useRealtime('patients', loadData)
+  useRealtime('appointments', loadData)
   useRealtime('medical_notes', loadData)
   useRealtime('pain_points', loadData)
   useRealtime('consultations_finance', loadData)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
-        <p className="text-muted-foreground">Resumo geral de atividades e finanças.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard Clínico</h1>
+          <p className="text-muted-foreground">Resumo geral de atividades e finanças.</p>
+        </div>
+        <Button onClick={() => setSheetOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Novo Agendamento
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -233,6 +241,8 @@ export default function Index() {
           </CardContent>
         </Card>
       </div>
+
+      <AppointmentSheet open={sheetOpen} onOpenChange={setSheetOpen} selectedDate={new Date()} />
     </div>
   )
 }

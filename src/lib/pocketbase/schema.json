@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-17T23:15:15.482Z",
+  "generatedAt": "2026-04-18T00:22:06.529Z",
   "collections": [
     {
       "name": "users",
@@ -475,6 +475,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "professional_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": ["CREATE INDEX idx_appointments_start ON appointments (start_time)"]
