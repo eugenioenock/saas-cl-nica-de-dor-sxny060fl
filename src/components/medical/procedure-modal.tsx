@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -42,6 +43,7 @@ const formSchema = z.object({
   professionalId: z.string().min(1, 'O profissional é obrigatório'),
   procedure: z.string().min(1, 'A descrição é obrigatória'),
   materials: z.array(z.any()).optional(),
+  signature: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -61,10 +63,18 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
       date: new Date().toISOString().split('T')[0],
       professionalId: currentUser.id,
       procedure: '',
+      signature: '',
     },
   })
 
+  const hasHighCost = form.watch('materials')?.some((m: any) => m.isHighCost)
+
   async function onSubmit(values: FormValues) {
+    if (hasHighCost && !values.signature) {
+      toast.error('A assinatura digital é obrigatória para materiais de alto custo.')
+      return
+    }
+
     try {
       const appointment = await pb.collection('appointments').create({
         patient_id: patientId,
@@ -86,6 +96,11 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
             quantity_used: mat.quantity,
             professional_id: values.professionalId,
             usage_date: new Date(values.date).toISOString(),
+            is_verified: mat.isHighCost ? true : false,
+            verified_at: mat.isHighCost ? new Date().toISOString() : null,
+            signature_hash: mat.isHighCost
+              ? btoa(values.signature + '-' + Date.now()).substring(0, 15)
+              : '',
           })
         }
       }
@@ -196,6 +211,26 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
                 </FormItem>
               )}
             />
+            {hasHighCost && (
+              <FormField
+                control={form.control}
+                name="signature"
+                render={({ field }) => (
+                  <FormItem className="bg-purple-50 p-3 rounded-md border border-purple-200">
+                    <FormLabel className="text-purple-800">
+                      Assinatura Digital (Alto Custo)
+                    </FormLabel>
+                    <FormDescription className="text-purple-600/80 text-xs">
+                      Confirme o uso do material de alto custo digitando sua senha ou PIN.
+                    </FormDescription>
+                    <FormControl>
+                      <Input type="password" placeholder="***" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter className="pt-4">
               <Button type="submit" className="w-full sm:w-auto">
                 Salvar Registro

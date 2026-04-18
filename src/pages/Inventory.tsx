@@ -43,6 +43,8 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
+import { Switch } from '@/components/ui/switch'
 
 export default function Inventory() {
   const { toast } = useToast()
@@ -69,10 +71,54 @@ export default function Inventory() {
   const [traceMaterial, setTraceMaterial] = useState<any>(null)
   const [traceLogs, setTraceLogs] = useState<any[]>([])
 
+  const { user } = useAuth()
+
+  const handleSaveCount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!countForm.material_id || !countForm.actual_quantity) return
+    setIsSubmitting(true)
+
+    try {
+      const material = items.find((m) => m.id === countForm.material_id)
+      const expected = material?.current_quantity || 0
+      const actual = parseFloat(countForm.actual_quantity)
+      const discrepancy = actual - expected
+
+      await pb.collection('inventory_counts').create({
+        material_id: material.id,
+        expected_quantity: expected,
+        actual_quantity: actual,
+        discrepancy,
+        professional_id: user?.id,
+      })
+
+      if (discrepancy !== 0) {
+        await pb.collection('clinical_inventory').update(material.id, {
+          current_quantity: actual,
+        })
+      }
+
+      toast({ title: 'Contagem registrada com sucesso.' })
+      setCountModalOpen(false)
+      setCountForm({ material_id: '', actual_quantity: '' })
+    } catch (err) {
+      toast({ title: 'Erro ao registrar contagem.', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const [formData, setFormData] = useState({
     name: '',
     min_quantity: '',
     unit: 'un',
+    is_high_cost: false,
+  })
+
+  const [countModalOpen, setCountModalOpen] = useState(false)
+  const [countForm, setCountForm] = useState({
+    material_id: '',
+    actual_quantity: '',
   })
 
   const loadData = async () => {
@@ -110,6 +156,7 @@ export default function Inventory() {
         name: formData.name,
         min_quantity: parseFloat(formData.min_quantity),
         unit: formData.unit,
+        is_high_cost: formData.is_high_cost,
         current_quantity: editingId ? undefined : 0,
       }
 
@@ -123,7 +170,7 @@ export default function Inventory() {
 
       setIsOpen(false)
       setEditingId(null)
-      setFormData({ name: '', min_quantity: '', unit: 'un' })
+      setFormData({ name: '', min_quantity: '', unit: 'un', is_high_cost: false })
     } catch (err) {
       setFieldErrors(extractFieldErrors(err))
     } finally {
@@ -172,6 +219,7 @@ export default function Inventory() {
       name: item.name,
       min_quantity: item.min_quantity.toString(),
       unit: item.unit,
+      is_high_cost: !!item.is_high_cost,
     })
     setIsOpen(true)
   }
@@ -225,67 +273,88 @@ export default function Inventory() {
           <h1 className="text-3xl font-bold tracking-tight">Estoque Avançado</h1>
           <p className="text-muted-foreground">Gerencie materiais, lotes e rastreabilidade.</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingId(null)}>
-              <Plus className="mr-2 h-4 w-4" /> Novo Material
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? 'Editar Material' : 'Novo Material'}</DialogTitle>
-              <DialogDescription>Cadastre o tipo de material.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSaveMaterial} className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Nome do Material *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-                {fieldErrors.name && (
-                  <span className="text-xs text-destructive">{fieldErrors.name}</span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCountForm({ material_id: '', actual_quantity: '' })
+              setCountModalOpen(true)
+            }}
+          >
+            <History className="mr-2 h-4 w-4" /> Contagem Físico
+          </Button>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditingId(null)}>
+                <Plus className="mr-2 h-4 w-4" /> Novo Material
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingId ? 'Editar Material' : 'Novo Material'}</DialogTitle>
+                <DialogDescription>Cadastre o tipo de material.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSaveMaterial} className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label>Estoque Mínimo *</Label>
+                  <Label>Nome do Material *</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.min_quantity}
-                    onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
+                  {fieldErrors.name && (
+                    <span className="text-xs text-destructive">{fieldErrors.name}</span>
+                  )}
                 </div>
-                <div className="grid gap-2">
-                  <Label>Unidade de Medida *</Label>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(v) => setFormData({ ...formData, unit: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="un">Unidade (un)</SelectItem>
-                      <SelectItem value="ml">Mililitros (ml)</SelectItem>
-                      <SelectItem value="cx">Caixa (cx)</SelectItem>
-                      <SelectItem value="pct">Pacote (pct)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center space-x-2 pt-2 pb-2">
+                  <Switch
+                    id="high-cost"
+                    checked={formData.is_high_cost}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_high_cost: checked })
+                    }
+                  />
+                  <Label htmlFor="high-cost">Material de Alto Custo (Exige Assinatura)</Label>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Salvar
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Estoque Mínimo *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.min_quantity}
+                      onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Unidade de Medida *</Label>
+                    <Select
+                      value={formData.unit}
+                      onValueChange={(v) => setFormData({ ...formData, unit: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="un">Unidade (un)</SelectItem>
+                        <SelectItem value="ml">Mililitros (ml)</SelectItem>
+                        <SelectItem value="cx">Caixa (cx)</SelectItem>
+                        <SelectItem value="pct">Pacote (pct)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Salvar
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -347,7 +416,17 @@ export default function Inventory() {
                               )}
                             </Button>
                           </TableCell>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {item.name}
+                            {item.is_high_cost && (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 bg-purple-50 text-purple-700 border-purple-200"
+                              >
+                                Alto Custo
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="font-bold">{item.current_quantity}</TableCell>
                           <TableCell className="text-muted-foreground">
                             {item.min_quantity}
@@ -573,6 +652,75 @@ export default function Inventory() {
               </TableBody>
             </Table>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={countModalOpen} onOpenChange={setCountModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Contagem Física de Estoque</DialogTitle>
+            <DialogDescription>
+              Ajuste o estoque do sistema de acordo com a contagem física real.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveCount} className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Material</Label>
+              <Select
+                value={countForm.material_id}
+                onValueChange={(v) =>
+                  setCountForm({
+                    ...countForm,
+                    material_id: v,
+                    actual_quantity:
+                      items.find((m) => m.id === v)?.current_quantity?.toString() || '',
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {countForm.material_id && (
+              <div className="grid grid-cols-2 gap-4 mt-2 p-3 bg-muted rounded-md">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Sistema Espera:</Label>
+                  <div className="font-mono text-lg">
+                    {items.find((m) => m.id === countForm.material_id)?.current_quantity || 0}
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Quantidade Física Real *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={countForm.actual_quantity}
+                    onChange={(e) =>
+                      setCountForm({ ...countForm, actual_quantity: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="submit" disabled={isSubmitting || !countForm.material_id}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Registrar e Ajustar
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

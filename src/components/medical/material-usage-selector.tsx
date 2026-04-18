@@ -29,6 +29,7 @@ export interface MaterialUsage {
   quantity: number
   materialName: string
   batchNumber: string
+  isHighCost?: boolean
 }
 
 interface Props {
@@ -82,6 +83,7 @@ export function MaterialUsageSelector({ value = [], onChange }: Props) {
       quantity: qty,
       materialName: mat.name,
       batchNumber: batch.batch_number,
+      isHighCost: !!mat.is_high_cost,
     }
 
     onChange([...value, newUsage])
@@ -205,6 +207,11 @@ export function MaterialUsageSelector({ value = [], onChange }: Props) {
             >
               <div className="truncate pr-2">
                 <span className="font-medium">{v.materialName}</span>
+                {v.isHighCost && (
+                  <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200 uppercase font-semibold">
+                    Alto Custo
+                  </span>
+                )}
                 <span className="text-muted-foreground ml-2 text-xs">Lote: {v.batchNumber}</span>
               </div>
               <div className="flex items-center gap-3 shrink-0">

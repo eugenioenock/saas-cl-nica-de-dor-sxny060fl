@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T16:58:34.988Z",
+  "generatedAt": "2026-04-18T17:37:22.931Z",
   "collections": [
     {
       "name": "users",
@@ -612,6 +612,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "is_high_cost",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -857,6 +863,24 @@
           "required": false,
           "system": false,
           "collectionRef": "medical_notes"
+        },
+        {
+          "name": "is_verified",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "verified_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "signature_hash",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -906,6 +930,66 @@
           "type": "date",
           "required": false,
           "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "inventory_counts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'professional')",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'professional')",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'professional')",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'professional')",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "material_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinical_inventory"
+        },
+        {
+          "name": "expected_quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "actual_quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "discrepancy",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "professional_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
         },
         {
           "name": "created",

@@ -15,6 +15,7 @@ import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Link } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 import {
   Loader2,
   AlertCircle,
@@ -40,19 +41,33 @@ export default function Index() {
   const [insurancePending, setInsurancePending] = useState(0)
   const [abcData, setAbcData] = useState<any[]>([])
   const [criticalStock, setCriticalStock] = useState<any[]>([])
+  const [recentCounts, setRecentCounts] = useState<any[]>([])
 
   const loadData = async () => {
     try {
-      const [patients, appointments, finances, usersRes, feedbacks, usageRecords, inventoryRes] =
-        await Promise.all([
-          pb.collection('patients').getFullList(),
-          pb.collection('appointments').getFullList(),
-          pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
-          pb.collection('users').getFullList(),
-          pb.collection('feedbacks').getFullList(),
-          pb.collection('inventory_usage').getFullList({ expand: 'batch_id.material_id' }),
-          pb.collection('clinical_inventory').getFullList(),
-        ])
+      const [
+        patients,
+        appointments,
+        finances,
+        usersRes,
+        feedbacks,
+        usageRecords,
+        inventoryRes,
+        countsRes,
+      ] = await Promise.all([
+        pb.collection('patients').getFullList(),
+        pb.collection('appointments').getFullList(),
+        pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
+        pb.collection('users').getFullList(),
+        pb.collection('feedbacks').getFullList(),
+        pb.collection('inventory_usage').getFullList({ expand: 'batch_id.material_id' }),
+        pb.collection('clinical_inventory').getFullList(),
+        pb
+          .collection('inventory_counts')
+          .getList(1, 10, { sort: '-created', expand: 'material_id,professional_id' }),
+      ])
+
+      setRecentCounts(countsRes.items)
 
       if (feedbacks.length > 0) {
         const avg = feedbacks.reduce((acc, f) => acc + f.rating, 0) / feedbacks.length
@@ -194,6 +209,7 @@ export default function Index() {
   useRealtime('patients', loadData)
   useRealtime('medical_notes', loadData)
   useRealtime('feedbacks', loadData)
+  useRealtime('inventory_counts', loadData)
 
   if (loading) {
     return (
@@ -304,6 +320,59 @@ export default function Index() {
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
                 Sem dados de consumo para análise ABC
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Inventory Counts / Discrepancies */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Auditoria de Estoque (Físico x Sistema)</CardTitle>
+            <CardDescription>Últimas contagens e divergências encontradas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentCounts.length > 0 ? (
+              <div className="space-y-4 mt-4">
+                {recentCounts.map((count) => {
+                  const isLoss = count.discrepancy < 0
+                  return (
+                    <div
+                      key={count.id}
+                      className="flex items-center justify-between border-b pb-2 last:border-0"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">
+                          {count.expand?.material_id?.name || 'Material'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(count.created).toLocaleDateString()} por{' '}
+                          {count.expand?.professional_id?.name?.split(' ')[0] || 'Staff'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-sm font-bold">Físico: {count.actual_quantity}</span>
+                        {count.discrepancy !== 0 ? (
+                          <span
+                            className={cn(
+                              'text-xs font-semibold',
+                              isLoss ? 'text-destructive' : 'text-green-600',
+                            )}
+                          >
+                            {isLoss ? 'Perda:' : 'Sobra:'}{' '}
+                            {count.discrepancy > 0 ? `+${count.discrepancy}` : count.discrepancy}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sincronizado</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhuma contagem registrada.
               </div>
             )}
           </CardContent>
