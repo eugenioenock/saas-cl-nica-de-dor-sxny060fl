@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T03:40:21.977Z",
+  "generatedAt": "2026-04-18T03:45:07.513Z",
   "collections": [
     {
       "name": "users",
@@ -856,6 +856,66 @@
         "CREATE INDEX idx_inv_usage_batch ON inventory_usage (batch_id)",
         "CREATE INDEX idx_inv_usage_patient ON inventory_usage (patient_id)"
       ]
+    },
+    {
+      "name": "purchase_orders",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "material_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinical_inventory"
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["draft", "ordered", "received", "cancelled"]
+        },
+        {
+          "name": "supplier",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "expected_delivery",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

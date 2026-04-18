@@ -10,6 +10,8 @@ import {
   Stethoscope,
   BarChart3,
   ShieldPlus,
+  ShoppingCart,
+  Zap,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -31,6 +33,8 @@ const adminNavItems = [
   { title: 'Pacientes', icon: Users, url: '/pacientes' },
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
+  { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
+  { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
   { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
   { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },

@@ -134,13 +134,11 @@ export default function PatientRecord() {
           .getList(1, 1)
           .catch(() => null),
         pb.collection('users').getFullList(),
-        pb
-          .collection('inventory_usage')
-          .getFullList({
-            filter: `patient_id="${id}"`,
-            expand: 'batch_id,batch_id.material_id,professional_id',
-            sort: '-usage_date',
-          }),
+        pb.collection('inventory_usage').getFullList({
+          filter: `patient_id="${id}"`,
+          expand: 'batch_id,batch_id.material_id,professional_id',
+          sort: '-usage_date',
+        }),
         pb.collection('clinical_inventory').getFullList({ sort: 'name' }),
         pb
           .collection('inventory_batches')

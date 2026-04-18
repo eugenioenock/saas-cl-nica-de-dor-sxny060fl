@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+} from 'recharts'
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { Link } from 'react-router-dom'
 import {
   Loader2,
+  AlertCircle,
+  ShoppingCart,
   Users,
   CalendarCheck,
   TrendingUp,
@@ -25,16 +38,21 @@ export default function Index() {
   const [performanceData, setPerformanceData] = useState<any[]>([])
   const [satisfaction, setSatisfaction] = useState(0)
   const [insurancePending, setInsurancePending] = useState(0)
+  const [abcData, setAbcData] = useState<any[]>([])
+  const [criticalStock, setCriticalStock] = useState<any[]>([])
 
   const loadData = async () => {
     try {
-      const [patients, appointments, finances, usersRes, feedbacks] = await Promise.all([
-        pb.collection('patients').getFullList(),
-        pb.collection('appointments').getFullList(),
-        pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
-        pb.collection('users').getFullList(),
-        pb.collection('feedbacks').getFullList(),
-      ])
+      const [patients, appointments, finances, usersRes, feedbacks, usageRecords, inventoryRes] =
+        await Promise.all([
+          pb.collection('patients').getFullList(),
+          pb.collection('appointments').getFullList(),
+          pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
+          pb.collection('users').getFullList(),
+          pb.collection('feedbacks').getFullList(),
+          pb.collection('inventory_usage').getFullList({ expand: 'batch_id.material_id' }),
+          pb.collection('clinical_inventory').getFullList(),
+        ])
 
       if (feedbacks.length > 0) {
         const avg = feedbacks.reduce((acc, f) => acc + f.rating, 0) / feedbacks.length
@@ -99,6 +117,67 @@ export default function Index() {
 
       const chartData = Object.values(perfMap).sort((a, b) => b.consultations - a.consultations)
       setPerformanceData(chartData)
+
+      // ABC Curve Logic
+      const materialCostMap = new Map<string, { name: string; totalValue: number }>()
+      usageRecords.forEach((u) => {
+        const batch = u.expand?.batch_id
+        const material = batch?.expand?.material_id
+        if (material && batch) {
+          const cost = u.quantity_used * (batch.cost_price || 0)
+          if (cost > 0) {
+            const existing = materialCostMap.get(material.id)
+            if (existing) {
+              existing.totalValue += cost
+            } else {
+              materialCostMap.set(material.id, { name: material.name, totalValue: cost })
+            }
+          }
+        }
+      })
+      const sortedMaterials = Array.from(materialCostMap.values()).sort(
+        (a, b) => b.totalValue - a.totalValue,
+      )
+      const totalOverallValue = sortedMaterials.reduce((sum, m) => sum + m.totalValue, 0)
+
+      let cumulative = 0
+      const abcItems = sortedMaterials.map((m) => {
+        cumulative += m.totalValue
+        const percentage = (cumulative / totalOverallValue) * 100
+        let category = 'C'
+        if (percentage <= 70) category = 'A'
+        else if (percentage <= 90) category = 'B'
+        return { ...m, category }
+      })
+
+      const abcSummary = [
+        {
+          name: 'Cat A (70%)',
+          value: abcItems
+            .filter((m) => m.category === 'A')
+            .reduce((sum, m) => sum + m.totalValue, 0),
+          fill: 'hsl(var(--destructive))',
+        },
+        {
+          name: 'Cat B (20%)',
+          value: abcItems
+            .filter((m) => m.category === 'B')
+            .reduce((sum, m) => sum + m.totalValue, 0),
+          fill: 'hsl(var(--warning))',
+        },
+        {
+          name: 'Cat C (10%)',
+          value: abcItems
+            .filter((m) => m.category === 'C')
+            .reduce((sum, m) => sum + m.totalValue, 0),
+          fill: 'hsl(var(--primary))',
+        },
+      ].filter((item) => item.value > 0)
+      setAbcData(abcSummary)
+
+      // Critical Stock
+      const critical = inventoryRes.filter((item) => item.current_quantity <= item.min_quantity)
+      setCriticalStock(critical)
     } catch (e) {
       console.error('Error loading dashboard data', e)
     } finally {
@@ -187,6 +266,101 @@ export default function Index() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-blue-600">R$ {insurancePending.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* ABC Curve */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Curva ABC - Consumo de Estoque</CardTitle>
+            <CardDescription>
+              Classificação financeira dos materiais (A: 70%, B: 20%, C: 10%).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {abcData.length > 0 ? (
+              <ChartContainer config={{}} className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={abcData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {abcData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                Sem dados de consumo para análise ABC
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Critical Stock */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Estoque Crítico
+              </CardTitle>
+              <CardDescription>Materiais abaixo da quantidade mínima</CardDescription>
+            </div>
+            <Link to="/inventory/orders">
+              <ShoppingCart className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {criticalStock.length > 0 ? (
+              <div className="space-y-4 mt-4">
+                {criticalStock.slice(0, 5).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between border-b pb-2 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Mínimo: {item.min_quantity} {item.unit}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-destructive font-bold text-sm">
+                        {item.current_quantity} {item.unit}
+                      </span>
+                      <Link
+                        to="/inventory/orders"
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        Ver Pedidos
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+                {criticalStock.length > 5 && (
+                  <p className="text-xs text-center text-muted-foreground pt-2">
+                    + {criticalStock.length - 5} outros itens críticos
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum item em estado crítico
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

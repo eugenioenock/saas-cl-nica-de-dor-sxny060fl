@@ -17,6 +17,8 @@ import Agenda from './pages/Agenda'
 import Login from './pages/Login'
 import Portal from './pages/Portal'
 import Insurance from './pages/Insurance'
+import Orders from './pages/Orders'
+import QuickUsage from './pages/QuickUsage'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -57,6 +59,8 @@ const App = () => (
               <Route path="/pacientes/:id" element={<PatientRecord />} />
               <Route path="/records" element={<RecordsRedirect />} />
               <Route path="/inventory" element={<Inventory />} />
+              <Route path="/inventory/orders" element={<Orders />} />
+              <Route path="/inventory/usage/quick" element={<QuickUsage />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/insurance" element={<Insurance />} />
               <Route path="/reports" element={<Reports />} />
