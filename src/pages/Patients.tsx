@@ -54,6 +54,7 @@ export default function Patients() {
   const [isOpen, setIsOpen] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [insurancePlans, setInsurancePlans] = useState<any[]>([])
   const [formData, setFormData] = useState({
     name: '',
     document: '',
@@ -61,6 +62,8 @@ export default function Patients() {
     email: '',
     phone: '',
     gender: '',
+    insurance_plan_id: '',
+    policy_number: '',
   })
 
   const [pathologies, setPathologies] = useState<string[]>([])
@@ -101,8 +104,12 @@ export default function Patients() {
 
   const loadData = async () => {
     try {
-      const records = await pb.collection('patients').getFullList({ sort: '-created' })
+      const [records, plans] = await Promise.all([
+        pb.collection('patients').getFullList({ sort: '-created', expand: 'insurance_plan_id' }),
+        pb.collection('insurance_plans').getFullList({ sort: 'name', filter: 'active=true' }),
+      ])
       setLocalPatients(records)
+      setInsurancePlans(plans)
     } catch (e) {
       console.error(e)
     } finally {
@@ -146,12 +153,22 @@ export default function Patients() {
     try {
       const payload = {
         ...formData,
+        insurance_plan_id: formData.insurance_plan_id === 'none' ? '' : formData.insurance_plan_id,
         dob: formData.dob ? new Date(formData.dob).toISOString().replace('T', ' ') : '',
         clinicId: activeClinic.id,
       }
       await pb.collection('patients').create(payload)
       setIsOpen(false)
-      setFormData({ name: '', document: '', dob: '', email: '', phone: '', gender: '' })
+      setFormData({
+        name: '',
+        document: '',
+        dob: '',
+        email: '',
+        phone: '',
+        gender: '',
+        insurance_plan_id: '',
+        policy_number: '',
+      })
       toast({
         title: 'Paciente cadastrado',
         description: 'O paciente foi adicionado com sucesso no banco de dados.',
@@ -250,6 +267,35 @@ export default function Patients() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Convênio</Label>
+                  <Select
+                    value={formData.insurance_plan_id}
+                    onValueChange={(v) => setFormData({ ...formData, insurance_plan_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum (Particular)</SelectItem>
+                      {insurancePlans.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="policy">Nº Carteirinha</Label>
+                  <Input
+                    id="policy"
+                    value={formData.policy_number}
+                    onChange={(e) => setFormData({ ...formData, policy_number: e.target.value })}
                   />
                 </div>
               </div>
@@ -362,8 +408,16 @@ export default function Patients() {
                       {calculateAge(patient.dob)} anos (
                       {patient.dob && new Date(patient.dob).toLocaleDateString('pt-BR')})
                     </TableCell>
-                    <TableCell>{patient.phone || patient.email || '(11) 99999-9999'}</TableCell>
+                    <TableCell>
+                      {patient.phone || patient.email || '(11) 99999-9999'}
+                      {patient.expand?.insurance_plan_id && (
+                        <div className="text-xs text-blue-600 font-medium mt-1">
+                          Convênio: {patient.expand.insurance_plan_id.name}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right px-6">
+                      {' '}
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/pacientes/${patient.id}`}>
                           <FileText className="mr-2 h-4 w-4 text-primary" />

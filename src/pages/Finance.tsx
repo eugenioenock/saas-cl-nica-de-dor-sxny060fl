@@ -45,29 +45,34 @@ export default function Finance() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [receiptRecord, setReceiptRecord] = useState<any>(null)
+  const [insurancePlans, setInsurancePlans] = useState<any[]>([])
   const [formData, setFormData] = useState({
     patient_id: '',
     amount: '',
     status: 'pending',
     payment_method: 'pix',
     due_date: '',
+    billing_type: 'private',
+    insurance_plan_id: '',
   })
 
   const loadData = async () => {
     try {
       const records = await pb.collection('consultations_finance').getFullList({
         sort: '-created',
-        expand: 'patient_id',
+        expand: 'patient_id,insurance_plan_id',
       })
       setFinances(records)
-      const [pts, settings] = await Promise.all([
+      const [pts, plans, settings] = await Promise.all([
         pb.collection('patients').getFullList({ sort: 'name' }),
+        pb.collection('insurance_plans').getFullList({ sort: 'name', filter: 'active=true' }),
         pb
           .collection('clinic_settings')
           .getList(1, 1)
           .catch(() => null),
       ])
       setPatients(pts)
+      setInsurancePlans(plans)
       if (settings?.items.length) setClinicSettings(settings.items[0])
     } catch (e) {
       console.error(e)
@@ -104,6 +109,8 @@ export default function Finance() {
         status: 'pending',
         payment_method: 'pix',
         due_date: '',
+        billing_type: 'private',
+        insurance_plan_id: '',
       })
       toast({ title: 'Registro financeiro salvo com sucesso.' })
     } catch (err) {
@@ -127,6 +134,14 @@ export default function Finance() {
         return <Badge className="bg-green-100 text-green-800 border-green-200">Pago</Badge>
       case 'cancelled':
         return <Badge variant="destructive">Cancelado</Badge>
+      case 'glosa':
+        return <Badge variant="destructive">Glosa</Badge>
+      case 'transfer_pending':
+        return (
+          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+            Repasse Pend.
+          </Badge>
+        )
       default:
         return (
           <Badge variant="outline" className="text-orange-600 border-orange-200">
@@ -156,6 +171,49 @@ export default function Finance() {
                 <DialogDescription>Adicione uma nova cobrança ou pagamento.</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSave} className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Tipo de Faturamento</Label>
+                    <Select
+                      value={formData.billing_type}
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          billing_type: v,
+                          payment_method: v === 'insurance' ? 'transfer' : 'pix',
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="private">Particular</SelectItem>
+                        <SelectItem value="insurance">Convênio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formData.billing_type === 'insurance' && (
+                    <div className="grid gap-2">
+                      <Label>Convênio</Label>
+                      <Select
+                        value={formData.insurance_plan_id}
+                        onValueChange={(v) => setFormData({ ...formData, insurance_plan_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {insurancePlans.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
                 <div className="grid gap-2">
                   <Label>Paciente *</Label>
                   <Select
@@ -201,6 +259,8 @@ export default function Finance() {
                         <SelectItem value="pending">Pendente</SelectItem>
                         <SelectItem value="paid">Pago</SelectItem>
                         <SelectItem value="cancelled">Cancelado</SelectItem>
+                        <SelectItem value="glosa">Glosa (Rejeitado)</SelectItem>
+                        <SelectItem value="transfer_pending">Repasse Pendente</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -254,7 +314,7 @@ export default function Finance() {
                   <TableHead>Data</TableHead>
                   <TableHead>Paciente</TableHead>
                   <TableHead>Vencimento</TableHead>
-                  <TableHead>Método</TableHead>
+                  <TableHead>Faturamento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
@@ -280,7 +340,18 @@ export default function Finance() {
                       <TableCell>
                         {f.due_date ? new Date(f.due_date).toLocaleDateString() : '-'}
                       </TableCell>
-                      <TableCell className="capitalize">{f.payment_method}</TableCell>
+                      <TableCell>
+                        {f.billing_type === 'insurance' ? (
+                          <div className="text-sm">
+                            <span className="font-semibold text-blue-600">Convênio</span>
+                            <div className="text-xs text-muted-foreground">
+                              {f.expand?.insurance_plan_id?.name}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm capitalize">{f.payment_method}</div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(f.status)}

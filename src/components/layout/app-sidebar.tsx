@@ -9,6 +9,7 @@ import {
   Settings,
   Stethoscope,
   BarChart3,
+  ShieldPlus,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -22,21 +23,28 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
 
-const navItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, url: '/' },
+const adminNavItems = [
+  { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Agenda', icon: CalendarDays, url: '/agenda' },
   { title: 'Pacientes', icon: Users, url: '/pacientes' },
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
   { title: 'Financeiro', icon: DollarSign, url: '/finance' },
+  { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },
 ]
+
+const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
 
 const settingsItems = [{ title: 'Configurações', icon: Settings, url: '/settings' }]
 
 export function AppSidebar() {
   const location = useLocation()
+  const { user } = useAuth()
+  const isPatient = user?.role === 'patient'
+  const navItems = isPatient ? patientNavItems : adminNavItems
 
   return (
     <Sidebar variant="inset">
@@ -72,26 +80,28 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {settingsItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.url}
-                    tooltip={item.title}
-                  >
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {!isPatient && (
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {settingsItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname === item.url}
+                      tooltip={item.title}
+                    >
+                      <Link to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t p-4 text-xs text-center text-muted-foreground">
         v0.0.1

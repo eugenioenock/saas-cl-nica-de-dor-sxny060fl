@@ -4,7 +4,15 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
-import { Loader2, Users, CalendarCheck, TrendingUp, Activity } from 'lucide-react'
+import {
+  Loader2,
+  Users,
+  CalendarCheck,
+  TrendingUp,
+  Activity,
+  Star,
+  ShieldAlert,
+} from 'lucide-react'
 
 export default function Index() {
   const [loading, setLoading] = useState(true)
@@ -15,15 +23,25 @@ export default function Index() {
     pendingRevenue: 0,
   })
   const [performanceData, setPerformanceData] = useState<any[]>([])
+  const [satisfaction, setSatisfaction] = useState(0)
+  const [insurancePending, setInsurancePending] = useState(0)
 
   const loadData = async () => {
     try {
-      const [patients, appointments, finances, usersRes] = await Promise.all([
+      const [patients, appointments, finances, usersRes, feedbacks] = await Promise.all([
         pb.collection('patients').getFullList(),
         pb.collection('appointments').getFullList(),
         pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
         pb.collection('users').getFullList(),
+        pb.collection('feedbacks').getFullList(),
       ])
+
+      if (feedbacks.length > 0) {
+        const avg = feedbacks.reduce((acc, f) => acc + f.rating, 0) / feedbacks.length
+        setSatisfaction(avg)
+      } else {
+        setSatisfaction(0)
+      }
 
       const totalRevenue = finances
         .filter((f) => f.status === 'paid')
@@ -32,6 +50,11 @@ export default function Index() {
       const pendingRevenue = finances
         .filter((f) => f.status === 'pending')
         .reduce((sum, f) => sum + f.amount, 0)
+
+      const totalInsurancePending = finances
+        .filter((f) => f.billing_type === 'insurance' && f.status === 'transfer_pending')
+        .reduce((sum, f) => sum + f.amount, 0)
+      setInsurancePending(totalInsurancePending)
 
       setKpis({
         totalPatients: patients.length,
@@ -91,6 +114,7 @@ export default function Index() {
   useRealtime('consultations_finance', loadData)
   useRealtime('patients', loadData)
   useRealtime('medical_notes', loadData)
+  useRealtime('feedbacks', loadData)
 
   if (loading) {
     return (
@@ -107,10 +131,10 @@ export default function Index() {
         <p className="text-muted-foreground">Visão geral do desempenho e métricas da clínica.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pacientes Ativos</CardTitle>
+            <CardTitle className="text-xs font-medium">Pacientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -119,7 +143,7 @@ export default function Index() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Consultas</CardTitle>
+            <CardTitle className="text-xs font-medium">Consultas</CardTitle>
             <CalendarCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -128,20 +152,41 @@ export default function Index() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Gerada</CardTitle>
+            <CardTitle className="text-xs font-medium">Receita</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ {kpis.totalRevenue.toFixed(2)}</div>
+            <div className="text-xl font-bold">R$ {kpis.totalRevenue.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Pendente</CardTitle>
+            <CardTitle className="text-xs font-medium">Pendente</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ {kpis.pendingRevenue.toFixed(2)}</div>
+            <div className="text-xl font-bold">R$ {kpis.pendingRevenue.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium">Satisfação</CardTitle>
+            <Star className="h-4 w-4 text-yellow-500 fill-current" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {satisfaction > 0 ? satisfaction.toFixed(1) : '-'}{' '}
+              <span className="text-sm font-normal text-muted-foreground">/ 5</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium">A Receber (Convênio)</CardTitle>
+            <ShieldAlert className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-blue-600">R$ {insurancePending.toFixed(2)}</div>
           </CardContent>
         </Card>
       </div>

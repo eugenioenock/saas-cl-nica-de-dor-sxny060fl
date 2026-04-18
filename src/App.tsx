@@ -15,6 +15,8 @@ import NotFound from './pages/NotFound'
 import RecordsRedirect from './pages/RecordsRedirect'
 import Agenda from './pages/Agenda'
 import Login from './pages/Login'
+import Portal from './pages/Portal'
+import Insurance from './pages/Insurance'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -25,7 +27,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>
 }
 
-// Reminder: GitHub integration is a premium feature available via the Skip Cloud dashboard to version control these new implementations.
+const RouteDispatcher = () => {
+  const { user } = useAuth()
+  if (user?.role === 'patient') return <Navigate to="/portal" replace />
+  return <Navigate to="/dashboard" replace />
+}
+
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
     <AuthProvider>
@@ -42,14 +49,16 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<RouteDispatcher />} />
               <Route path="/dashboard" element={<Index />} />
+              <Route path="/portal" element={<Portal />} />
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/:id" element={<PatientRecord />} />
               <Route path="/records" element={<RecordsRedirect />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/finance" element={<Finance />} />
+              <Route path="/insurance" element={<Insurance />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

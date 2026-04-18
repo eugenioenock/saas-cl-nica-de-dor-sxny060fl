@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-18T00:37:15.613Z",
+  "generatedAt": "2026-04-18T00:42:00.490Z",
   "collections": [
     {
       "name": "users",
@@ -37,6 +37,20 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["admin", "professional", "patient"]
+        },
+        {
+          "name": "patient_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "patients"
         }
       ],
       "indexes": [
@@ -111,6 +125,19 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "insurance_plan_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "insurance_plans"
+        },
+        {
+          "name": "policy_number",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -379,8 +406,8 @@
       "name": "consultations_finance",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
+        "list": "@request.auth.id != '' && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "view": "@request.auth.id != '' && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != ''",
         "delete": "@request.auth.id != ''"
@@ -411,7 +438,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["pending", "paid", "cancelled"]
+          "selectValues": ["pending", "paid", "cancelled", "glosa", "transfer_pending"]
         },
         {
           "name": "due_date",
@@ -439,6 +466,20 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "billing_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["private", "insurance"]
+        },
+        {
+          "name": "insurance_plan_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "insurance_plans"
         }
       ],
       "indexes": []
@@ -447,8 +488,8 @@
       "name": "appointments",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
+        "list": "@request.auth.id != '' && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "view": "@request.auth.id != '' && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != ''",
         "delete": "@request.auth.id != ''"
@@ -557,6 +598,93 @@
           "required": true,
           "system": false,
           "selectValues": ["un", "ml", "cx", "pct"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "insurance_plans",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.role = 'admin'",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "feedbacks",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && (@request.auth.role != 'patient' || appointment_id.patient_id = @request.auth.patient_id)",
+        "update": "@request.auth.id != '' && (@request.auth.role != 'patient' || appointment_id.patient_id = @request.auth.patient_id)",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "appointment_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "appointments"
+        },
+        {
+          "name": "rating",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "comment",
+          "type": "text",
+          "required": false,
+          "system": false
         },
         {
           "name": "created",
