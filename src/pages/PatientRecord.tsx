@@ -51,6 +51,7 @@ import { toast } from 'sonner'
 import { Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import {
   Command,
   CommandEmpty,
@@ -309,29 +310,31 @@ export default function PatientRecord() {
           </TabsList>
 
           <TabsContent value="map" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-            <Card className="md:col-span-2">
-              <CardHeader className="flex flex-row justify-between pb-2">
-                <CardTitle>Mapeamento Corporal</CardTitle>
-                <div className="flex bg-muted p-1 rounded-md">
+            <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
+                <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
+                <div className="flex bg-muted/50 p-1 rounded-lg backdrop-blur-sm border">
                   <Button
-                    variant={view === 'front' ? 'default' : 'ghost'}
+                    variant={view === 'front' ? 'secondary' : 'ghost'}
                     size="sm"
+                    className={cn('transition-all', view === 'front' && 'shadow-sm')}
                     onClick={() => setView('front')}
                   >
-                    Frente
+                    Visão Frontal
                   </Button>
                   <Button
-                    variant={view === 'back' ? 'default' : 'ghost'}
+                    variant={view === 'back' ? 'secondary' : 'ghost'}
                     size="sm"
+                    className={cn('transition-all', view === 'back' && 'shadow-sm')}
                     onClick={() => setView('back')}
                   >
-                    Costas
+                    Visão Posterior
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 bg-gradient-to-b from-muted/10 to-muted/30">
                 <div
-                  className="relative aspect-[1/2] max-w-sm mx-auto bg-slate-50 border rounded-lg overflow-hidden cursor-crosshair"
+                  className="relative aspect-[1/2] max-w-sm mx-auto bg-background/80 backdrop-blur-md border border-border/50 rounded-2xl overflow-hidden cursor-crosshair shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] transition-all duration-300 hover:shadow-[0_0_50px_-15px_rgba(0,0,0,0.2)]"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect()
                     setForm({
@@ -346,63 +349,207 @@ export default function PatientRecord() {
                     setIsOpen(true)
                   }}
                 >
+                  <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
                   <img
-                    src={`https://img.usecurling.com/p/400/800?q=human%20anatomy%20${view}&color=gray`}
-                    alt="Body"
-                    className="w-full h-full object-cover opacity-50 pointer-events-none"
+                    src={`https://img.usecurling.com/p/600/1200?q=professional%20medical%20anatomy%203d%20model%20${view}&color=gray`}
+                    alt={`Body ${view}`}
+                    className="w-full h-full object-cover opacity-90 mix-blend-luminosity pointer-events-none transition-opacity duration-500"
                   />
-                  {visiblePoints.map((pt: any) => (
-                    <div
-                      key={pt.id}
-                      className="absolute w-4 h-4 bg-red-500 rounded-full -ml-2 -mt-2 border-2 border-white cursor-pointer hover:scale-125"
-                      style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setForm({ ...pt, pathologies: pt.pathologies || [] })
-                        setIsOpen(true)
-                      }}
-                    />
-                  ))}
+
+                  {visiblePoints.map((pt: any) => {
+                    const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
+                    return (
+                      <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                          <div
+                            className={cn(
+                              'absolute w-7 h-7 rounded-full -ml-3.5 -mt-3.5 border-[3px] border-white dark:border-background flex items-center justify-center text-[10px] font-bold text-white cursor-pointer hover:scale-125 hover:z-20 transition-all duration-300 shadow-md ring-2 ring-transparent hover:ring-primary/50',
+                              getIntensityColor(pt.intensity || 5),
+                            )}
+                            style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setForm({ ...pt, pathologies: pt.pathologies || [] })
+                              setIsOpen(true)
+                            }}
+                          >
+                            {globalIndex + 1}
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent
+                          className="w-72 z-50 glass-panel border-border/50 p-4"
+                          align="center"
+                          side="right"
+                          sideOffset={15}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
+                                <MapPin className="w-4 h-4 text-primary" />{' '}
+                                {pt.name || 'Ponto não nomeado'}
+                              </h4>
+                              <Badge
+                                className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
+                              >
+                                Nível {pt.intensity || 5}
+                              </Badge>
+                            </div>
+
+                            {pt.pathologies?.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {pt.pathologies.map((p: string) => (
+                                  <Badge
+                                    key={p}
+                                    variant="secondary"
+                                    className="text-[10px] px-1.5 py-0 h-5 font-medium bg-muted/80"
+                                  >
+                                    {p}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            {pt.notes ? (
+                              <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50 line-clamp-3 leading-relaxed">
+                                {pt.notes}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic opacity-70">
+                                Sem observações clínicas.
+                              </p>
+                            )}
+
+                            <div className="pt-2 border-t flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  remove(pt.id)
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setForm({ ...pt, pathologies: pt.pathologies || [] })
+                                  setIsOpen(true)
+                                }}
+                              >
+                                Editar Detalhes
+                              </Button>
+                            </div>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Pontos Ativos</CardTitle>
+
+            <Card className="glass-panel border-0 shadow-lg flex flex-col h-full">
+              <CardHeader className="bg-background/50 border-b pb-4">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  Pontos Ativos
+                  <Badge variant="outline" className="ml-2 font-normal bg-background shadow-sm">
+                    {data.points.length} Total
+                  </Badge>
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[500px]">
-                  <div className="space-y-4 pr-4">
-                    {data.points.map((pt: any) => (
-                      <div key={pt.id} className="p-3 border rounded-lg text-sm relative group">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6"
-                          onClick={() => remove(pt.id)}
+              <CardContent className="flex-1 p-0 overflow-hidden bg-gradient-to-b from-transparent to-muted/10">
+                <ScrollArea className="h-[600px] w-full">
+                  <div className="p-4 space-y-3">
+                    {data.points.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-16 flex flex-col items-center">
+                        <div className="bg-muted/50 p-4 rounded-full mb-4 ring-1 ring-border/50">
+                          <MapPin className="h-8 w-8 text-primary/40" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          Nenhum ponto registrado.
+                        </p>
+                        <p className="text-xs opacity-80 mt-1.5 max-w-[200px]">
+                          Clique na imagem anatômica para adicionar um novo ponto de dor e iniciar o
+                          mapeamento.
+                        </p>
+                      </div>
+                    ) : (
+                      data.points.map((pt: any, index: number) => (
+                        <div
+                          key={pt.id}
+                          className="p-3.5 bg-background border border-border/50 rounded-xl text-sm relative group shadow-sm hover:shadow-md transition-all duration-300 hover:border-primary/30"
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                        <div className="font-bold flex gap-2 items-center">
-                          <MapPin className="h-4 w-4 text-red-500" /> {pt.name || 'Ponto'}{' '}
-                          <Badge className={getIntensityColor(pt.intensity || 5)}>
-                            Nível {pt.intensity || 5}
-                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 h-7 w-7 transition-opacity hover:bg-destructive/10"
+                            onClick={() => remove(pt.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+
+                          <div className="font-bold flex gap-2.5 items-center text-foreground pr-8">
+                            <div
+                              className={cn(
+                                'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm',
+                                getIntensityColor(pt.intensity || 5),
+                              )}
+                            >
+                              {index + 1}
+                            </div>
+                            <span className="truncate text-sm">
+                              {pt.name || 'Ponto não nomeado'}
+                            </span>
+                            <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-widest ml-auto shrink-0 bg-muted px-1.5 py-0.5 rounded border border-border/50">
+                              {pt.view === 'front' ? 'Frontal' : 'Posterior'}
+                            </span>
+                          </div>
+
+                          <div className="mt-3">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                                Intensidade
+                              </span>
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden shadow-inner">
+                                <div
+                                  className={cn(
+                                    'h-full transition-all duration-500',
+                                    getIntensityColor(pt.intensity || 5),
+                                  )}
+                                  style={{ width: `${(pt.intensity / 10) * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold text-foreground">
+                                {pt.intensity}/10
+                              </span>
+                            </div>
+
+                            {pt.notes && (
+                              <p className="text-xs text-muted-foreground/90 line-clamp-2 mt-2.5 italic border-l-2 border-primary/20 pl-2">
+                                "{pt.notes}"
+                              </p>
+                            )}
+
+                            {pt.pathologies?.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-border/50">
+                                {pt.pathologies.map((p: string) => (
+                                  <Badge
+                                    key={p}
+                                    variant="secondary"
+                                    className="text-[9px] px-1.5 py-0 h-4.5 bg-muted/60 text-muted-foreground font-medium"
+                                  >
+                                    {p}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-muted-foreground line-clamp-2 mt-1">{pt.notes}</p>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {pt.pathologies?.map((p: string) => (
-                            <Badge key={p} variant="secondary" className="text-xs">
-                              {p}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {data.points.length === 0 && (
-                      <div className="text-center text-muted-foreground mt-10">
-                        Nenhum ponto registrado.
-                      </div>
+                      ))
                     )}
                   </div>
                 </ScrollArea>
