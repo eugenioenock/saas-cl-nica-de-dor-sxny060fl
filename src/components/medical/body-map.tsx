@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,34 +23,40 @@ import { toast } from 'sonner'
 
 type MapView = 'front' | 'back'
 
-const HOTSPOTS = [
-  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14 },
-  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 25 },
-  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 42 },
-  { id: 'ombro_dir', name: 'Ombro Direito', view: 'front', x: 30, y: 17.5 },
-  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'front', x: 70, y: 17.5 },
-  { id: 'ombro_dir_b', name: 'Ombro Direito', view: 'back', x: 70, y: 17.5 },
-  { id: 'ombro_esq_b', name: 'Ombro Esquerdo', view: 'back', x: 30, y: 17.5 },
-  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'front', x: 18, y: 37.5 },
-  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'front', x: 82, y: 37.5 },
-  { id: 'cotovelo_dir_b', name: 'Cotovelo Direito', view: 'back', x: 82, y: 37.5 },
-  { id: 'cotovelo_esq_b', name: 'Cotovelo Esquerdo', view: 'back', x: 18, y: 37.5 },
-  { id: 'punho_dir', name: 'Punho Direito', view: 'front', x: 10, y: 52.5 },
-  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'front', x: 90, y: 52.5 },
-  { id: 'punho_dir_b', name: 'Punho Direito', view: 'back', x: 90, y: 52.5 },
-  { id: 'punho_esq_b', name: 'Punho Esquerdo', view: 'back', x: 10, y: 52.5 },
-  { id: 'quadril_dir', name: 'Quadril Direito', view: 'front', x: 40, y: 50 },
-  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'front', x: 60, y: 50 },
-  { id: 'quadril_dir_b', name: 'Quadril Direito', view: 'back', x: 60, y: 50 },
-  { id: 'quadril_esq_b', name: 'Quadril Esquerdo', view: 'back', x: 40, y: 50 },
-  { id: 'joelho_dir', name: 'Joelho Direito', view: 'front', x: 35, y: 72.5 },
-  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 72.5 },
-  { id: 'joelho_dir_b', name: 'Joelho Direito', view: 'back', x: 65, y: 72.5 },
-  { id: 'joelho_esq_b', name: 'Joelho Esquerdo', view: 'back', x: 35, y: 72.5 },
-  { id: 'pe_dir', name: 'Pé Direito', view: 'front', x: 30, y: 95 },
-  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'front', x: 70, y: 95 },
-  { id: 'pe_dir_b', name: 'Pé Direito', view: 'back', x: 70, y: 95 },
-  { id: 'pe_esq_b', name: 'Pé Esquerdo', view: 'back', x: 30, y: 95 },
+const ANATOMY_REGIONS = [
+  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14, w: 14, h: 10 },
+  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
+  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 46, w: 18, h: 12 },
+
+  { id: 'ombro_dir_f', name: 'Ombro Direito', view: 'front', x: 28, y: 20, w: 15, h: 12 },
+  { id: 'ombro_esq_f', name: 'Ombro Esquerdo', view: 'front', x: 72, y: 20, w: 15, h: 12 },
+  { id: 'ombro_dir_b', name: 'Ombro Direito', view: 'back', x: 72, y: 20, w: 15, h: 12 },
+  { id: 'ombro_esq_b', name: 'Ombro Esquerdo', view: 'back', x: 28, y: 20, w: 15, h: 12 },
+
+  { id: 'cotovelo_dir_f', name: 'Cotovelo Direito', view: 'front', x: 18, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_esq_f', name: 'Cotovelo Esquerdo', view: 'front', x: 82, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_dir_b', name: 'Cotovelo Direito', view: 'back', x: 82, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_esq_b', name: 'Cotovelo Esquerdo', view: 'back', x: 18, y: 40, w: 12, h: 10 },
+
+  { id: 'punho_dir_f', name: 'Punho Direito', view: 'front', x: 10, y: 55, w: 10, h: 8 },
+  { id: 'punho_esq_f', name: 'Punho Esquerdo', view: 'front', x: 90, y: 55, w: 10, h: 8 },
+  { id: 'punho_dir_b', name: 'Punho Direito', view: 'back', x: 90, y: 55, w: 10, h: 8 },
+  { id: 'punho_esq_b', name: 'Punho Esquerdo', view: 'back', x: 10, y: 55, w: 10, h: 8 },
+
+  { id: 'quadril_dir_f', name: 'Quadril Direito', view: 'front', x: 38, y: 52, w: 16, h: 12 },
+  { id: 'quadril_esq_f', name: 'Quadril Esquerdo', view: 'front', x: 62, y: 52, w: 16, h: 12 },
+  { id: 'quadril_dir_b', name: 'Quadril Direito', view: 'back', x: 62, y: 52, w: 16, h: 12 },
+  { id: 'quadril_esq_b', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 52, w: 16, h: 12 },
+
+  { id: 'joelho_dir_f', name: 'Joelho Direito', view: 'front', x: 35, y: 75, w: 15, h: 10 },
+  { id: 'joelho_esq_f', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 75, w: 15, h: 10 },
+  { id: 'joelho_dir_b', name: 'Joelho Direito', view: 'back', x: 65, y: 75, w: 15, h: 10 },
+  { id: 'joelho_esq_b', name: 'Joelho Esquerdo', view: 'back', x: 35, y: 75, w: 15, h: 10 },
+
+  { id: 'pe_dir_f', name: 'Pé Direito', view: 'front', x: 32, y: 95, w: 16, h: 8 },
+  { id: 'pe_esq_f', name: 'Pé Esquerdo', view: 'front', x: 68, y: 95, w: 16, h: 8 },
+  { id: 'pe_dir_b', name: 'Pé Direito', view: 'back', x: 68, y: 95, w: 16, h: 8 },
+  { id: 'pe_esq_b', name: 'Pé Esquerdo', view: 'back', x: 32, y: 95, w: 16, h: 8 },
 ]
 
 export function BodyMap({ patientId }: { patientId: string }) {
@@ -60,8 +66,6 @@ export function BodyMap({ patientId }: { patientId: string }) {
   const [loading, setLoading] = useState(true)
   const [catalog, setCatalog] = useState<string[]>([])
   const [openComboboxId, setOpenComboboxId] = useState<string | null>(null)
-
-  const mapRef = useRef<HTMLDivElement>(null)
 
   const loadPoints = async () => {
     try {
@@ -91,8 +95,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
       .then((res) => setCatalog(res.map((c) => c.name)))
   })
 
-  const handleHotspotClick = async (hotspot: (typeof HOTSPOTS)[0]) => {
-    const existingPoint = points.find((p) => p.name === hotspot.name && p.view === hotspot.view)
+  const handleRegionClick = async (region: any, existingPoint: any) => {
     if (existingPoint) {
       if (
         existingPoint.notes ||
@@ -103,20 +106,16 @@ export function BodyMap({ patientId }: { patientId: string }) {
           description: 'Este ponto possui dados. Edite ou remova pelo painel lateral.',
         })
       } else {
-        try {
-          await pb.collection('pain_points').delete(existingPoint.id)
-        } catch (e) {
-          console.error(e)
-        }
+        handleDeletePoint(existingPoint.id)
       }
     } else {
       try {
         await pb.collection('pain_points').create({
           patient_id: patientId,
-          x: hotspot.x,
-          y: hotspot.y,
-          view: hotspot.view,
-          name: hotspot.name,
+          x: region.x,
+          y: region.y,
+          view: region.view,
+          name: region.name,
           pathologies: [],
           notes: '',
           intensity: 5,
@@ -124,25 +123,6 @@ export function BodyMap({ patientId }: { patientId: string }) {
       } catch (e) {
         console.error(e)
       }
-    }
-  }
-
-  const handleMapClick = async (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mapRef.current || (e.target as HTMLElement).closest('.hotspot-marker')) return
-    const rect = mapRef.current.getBoundingClientRect()
-    try {
-      await pb.collection('pain_points').create({
-        patient_id: patientId,
-        x: ((e.clientX - rect.left) / rect.width) * 100,
-        y: ((e.clientY - rect.top) / rect.height) * 100,
-        view,
-        name: '',
-        pathologies: [],
-        notes: '',
-        intensity: 5,
-      })
-    } catch (e) {
-      console.error(e)
     }
   }
 
@@ -199,7 +179,10 @@ export function BodyMap({ patientId }: { patientId: string }) {
     }
   }
 
-  const visiblePoints = points.filter((p) => p.view === view)
+  const visiblePoints = points.filter(
+    (p) => p.view === view || ANATOMY_REGIONS.some((r) => r.name === p.name && r.view === view),
+  )
+  const displayedPointsPanel = points.filter((p) => p.view === view) // For the right panel, we use the original view
 
   if (loading)
     return (
@@ -212,7 +195,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
   return (
     <div className="grid lg:grid-cols-2 gap-6 h-[600px]">
       <div className="relative border rounded-xl bg-slate-950 flex flex-col overflow-hidden shadow-inner">
-        <div className="flex justify-center p-3 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm z-10">
+        <div className="flex justify-center p-3 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm z-30">
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as MapView)}
@@ -235,104 +218,53 @@ export function BodyMap({ patientId }: { patientId: string }) {
           </Tabs>
         </div>
 
-        <div className="flex-1 relative flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950 overflow-hidden">
-          <div
-            ref={mapRef}
-            className="relative w-full max-w-[220px] aspect-[1/2] cursor-crosshair"
-            onClick={handleMapClick}
-          >
-            <svg
-              viewBox="0 0 100 200"
-              className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-            >
-              <defs>
-                <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.3" />
-                  <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.1" />
-                  <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0.4" />
-                </linearGradient>
-                <filter id="glowEffect">
-                  <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              <path
-                d="M 50 5 C 40 5 40 20 45 25 C 45 28 40 32 30 35 C 25 38 20 55 15 75 C 12 90 10 105 8 110 L 12 112 C 15 100 18 80 22 75 C 25 60 30 45 35 45 C 35 60 38 80 40 100 L 35 145 C 30 160 28 180 25 195 L 35 195 C 38 180 40 160 45 145 C 48 120 50 110 50 105 C 50 110 52 120 55 145 C 60 160 62 180 65 195 L 75 195 C 72 180 70 160 65 145 L 60 100 C 62 80 65 60 65 45 C 70 45 75 60 78 75 C 82 80 85 100 88 112 L 92 110 C 90 105 88 90 85 75 C 80 55 75 38 70 35 C 60 32 55 28 55 25 C 60 20 60 5 50 5 Z"
-                fill="url(#bodyGrad)"
-                stroke="#3b82f6"
-                strokeWidth="0.5"
-                filter="url(#glowEffect)"
-              />
-              {view === 'back' && (
-                <path
-                  d="M 50 15 L 50 90"
-                  stroke="#60a5fa"
-                  strokeWidth="0.5"
-                  strokeDasharray="1 2"
-                  opacity="0.6"
-                  filter="url(#glowEffect)"
-                />
-              )}
-            </svg>
+        <div className="flex-1 relative flex items-center justify-center p-4 bg-slate-950 overflow-hidden">
+          <div className="relative w-full max-w-[220px] aspect-[1/2]">
+            <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+            <img
+              src={`https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20${view}&color=cyan`}
+              alt={`Body ${view}`}
+              className="w-full h-full object-cover mix-blend-screen pointer-events-none opacity-80"
+            />
 
-            {HOTSPOTS.filter((h) => h.view === view).map((hotspot) => {
-              const point = points.find((p) => p.name === hotspot.name && p.view === view)
-              const isActive = !!point
-              const isHovered = point ? hoveredPointId === point.id : false
-              const colorClass =
-                point?.intensity >= 8
-                  ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]'
-                  : point?.intensity >= 5
-                    ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]'
-                    : 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.8)]'
+            {ANATOMY_REGIONS.filter((h) => h.view === view).map((region) => {
+              const pt = points.find((p) => p.name === region.name)
+              const isActive = !!pt
+              const isHovered = pt ? hoveredPointId === pt.id : false
+
               return (
                 <div
-                  key={hotspot.id}
+                  key={region.id}
                   className={cn(
-                    'hotspot-marker absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 group',
-                    isActive ? 'z-30' : 'z-20 hover:bg-blue-400/20',
+                    'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
+                    isActive
+                      ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
+                      : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
+                    isHovered && isActive && 'ring-2 ring-white/50 scale-110',
                   )}
-                  style={{ left: `${hotspot.x}%`, top: `${hotspot.y}%` }}
+                  style={{
+                    left: `${region.x}%`,
+                    top: `${region.y}%`,
+                    width: `${region.w}%`,
+                    height: `${region.h}%`,
+                  }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleHotspotClick(hotspot)
+                    handleRegionClick(region, pt)
                   }}
                   onMouseEnter={() => {
-                    if (isActive && point) setHoveredPointId(point.id)
+                    if (isActive && pt) setHoveredPointId(pt.id)
                   }}
                   onMouseLeave={() => {
-                    if (isActive && point) setHoveredPointId(null)
+                    if (isActive && pt) setHoveredPointId(null)
                   }}
-                  title={hotspot.name}
-                >
-                  {isActive ? (
-                    <>
-                      <div
-                        className={cn(
-                          'absolute inset-0 rounded-full animate-pulse blur-[4px]',
-                          colorClass.replace('bg-', 'bg-').replace('500', '600'),
-                        )}
-                      />
-                      <div
-                        className={cn(
-                          'relative w-3.5 h-3.5 rounded-full transition-transform',
-                          isHovered ? 'scale-125' : '',
-                          colorClass,
-                        )}
-                      />
-                    </>
-                  ) : (
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300/40 shadow-[0_0_5px_rgba(147,197,253,0.5)] group-hover:bg-blue-300 transition-colors" />
-                  )}
-                </div>
+                  title={region.name}
+                />
               )
             })}
 
             {visiblePoints
-              .filter((p) => !HOTSPOTS.some((h) => h.name === p.name && h.view === p.view))
+              .filter((p) => !ANATOMY_REGIONS.some((r) => r.name === p.name))
               .map((p) => {
                 const isHovered = hoveredPointId === p.id
                 const intensityColor =
@@ -344,7 +276,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
                 return (
                   <div
                     key={p.id}
-                    className="hotspot-marker absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 group z-20"
+                    className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 group z-30"
                     style={{ left: `${p.x}%`, top: `${p.y}%` }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -355,14 +287,14 @@ export function BodyMap({ patientId }: { patientId: string }) {
                   >
                     <div
                       className={cn(
-                        'absolute inset-1.5 rounded-full animate-pulse blur-[3px] opacity-70',
+                        'absolute inset-1 rounded-full animate-pulse blur-[3px] opacity-80',
                         intensityColor.replace('bg-', 'bg-').replace('500', '600'),
                       )}
                     />
                     <div
                       className={cn(
-                        'relative w-3 h-3 rounded-full transition-transform',
-                        isHovered ? 'scale-125' : '',
+                        'relative w-2.5 h-2.5 rounded-full transition-transform',
+                        isHovered ? 'scale-150 ring-2 ring-white/50' : '',
                         intensityColor,
                       )}
                     />
@@ -379,20 +311,20 @@ export function BodyMap({ patientId }: { patientId: string }) {
             <MapPin className="h-5 w-5 text-primary" /> Pontos Mapeados
           </h3>
           <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-md border">
-            {points.length} {points.length === 1 ? 'ponto' : 'pontos'}
+            {displayedPointsPanel.length} {displayedPointsPanel.length === 1 ? 'ponto' : 'pontos'}
           </span>
         </div>
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {points.length === 0 ? (
+            {displayedPointsPanel.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
-                <p>Nenhum ponto registrado.</p>
+                <p>Nenhum ponto registrado para esta visão.</p>
                 <p className="text-sm mt-1">
                   Interaja com a imagem ao lado para adicionar marcadores e iniciar a documentação.
                 </p>
               </div>
             ) : (
-              points.map((p, i) => (
+              displayedPointsPanel.map((p, i) => (
                 <Card
                   key={p.id}
                   className={cn(
@@ -402,7 +334,6 @@ export function BodyMap({ patientId }: { patientId: string }) {
                       : 'shadow-none border-border',
                   )}
                   onMouseEnter={() => {
-                    if (view !== p.view) setView(p.view)
                     setHoveredPointId(p.id)
                   }}
                   onMouseLeave={() => setHoveredPointId(null)}
@@ -420,7 +351,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
                         {i + 1}
                       </div>
                       <span className="capitalize text-muted-foreground text-xs font-normal">
-                        ({p.view === 'front' ? 'Frente' : 'Costas'})
+                        ({p.name || (p.view === 'front' ? 'Frente' : 'Costas')})
                       </span>
                     </CardTitle>
                     <Button

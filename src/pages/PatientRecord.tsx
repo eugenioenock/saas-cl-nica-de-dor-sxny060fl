@@ -62,6 +62,43 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { Package } from 'lucide-react'
+import React from 'react'
+
+const ANATOMY_REGIONS = [
+  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14, w: 14, h: 10 },
+  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
+  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 46, w: 18, h: 12 },
+
+  { id: 'ombro_dir_f', name: 'Ombro Direito', view: 'front', x: 28, y: 20, w: 15, h: 12 },
+  { id: 'ombro_esq_f', name: 'Ombro Esquerdo', view: 'front', x: 72, y: 20, w: 15, h: 12 },
+  { id: 'ombro_dir_b', name: 'Ombro Direito', view: 'back', x: 72, y: 20, w: 15, h: 12 },
+  { id: 'ombro_esq_b', name: 'Ombro Esquerdo', view: 'back', x: 28, y: 20, w: 15, h: 12 },
+
+  { id: 'cotovelo_dir_f', name: 'Cotovelo Direito', view: 'front', x: 18, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_esq_f', name: 'Cotovelo Esquerdo', view: 'front', x: 82, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_dir_b', name: 'Cotovelo Direito', view: 'back', x: 82, y: 40, w: 12, h: 10 },
+  { id: 'cotovelo_esq_b', name: 'Cotovelo Esquerdo', view: 'back', x: 18, y: 40, w: 12, h: 10 },
+
+  { id: 'punho_dir_f', name: 'Punho Direito', view: 'front', x: 10, y: 55, w: 10, h: 8 },
+  { id: 'punho_esq_f', name: 'Punho Esquerdo', view: 'front', x: 90, y: 55, w: 10, h: 8 },
+  { id: 'punho_dir_b', name: 'Punho Direito', view: 'back', x: 90, y: 55, w: 10, h: 8 },
+  { id: 'punho_esq_b', name: 'Punho Esquerdo', view: 'back', x: 10, y: 55, w: 10, h: 8 },
+
+  { id: 'quadril_dir_f', name: 'Quadril Direito', view: 'front', x: 38, y: 52, w: 16, h: 12 },
+  { id: 'quadril_esq_f', name: 'Quadril Esquerdo', view: 'front', x: 62, y: 52, w: 16, h: 12 },
+  { id: 'quadril_dir_b', name: 'Quadril Direito', view: 'back', x: 62, y: 52, w: 16, h: 12 },
+  { id: 'quadril_esq_b', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 52, w: 16, h: 12 },
+
+  { id: 'joelho_dir_f', name: 'Joelho Direito', view: 'front', x: 35, y: 75, w: 15, h: 10 },
+  { id: 'joelho_esq_f', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 75, w: 15, h: 10 },
+  { id: 'joelho_dir_b', name: 'Joelho Direito', view: 'back', x: 65, y: 75, w: 15, h: 10 },
+  { id: 'joelho_esq_b', name: 'Joelho Esquerdo', view: 'back', x: 35, y: 75, w: 15, h: 10 },
+
+  { id: 'pe_dir_f', name: 'Pé Direito', view: 'front', x: 32, y: 95, w: 16, h: 8 },
+  { id: 'pe_esq_f', name: 'Pé Esquerdo', view: 'front', x: 68, y: 95, w: 16, h: 8 },
+  { id: 'pe_dir_b', name: 'Pé Direito', view: 'back', x: 68, y: 95, w: 16, h: 8 },
+  { id: 'pe_esq_b', name: 'Pé Esquerdo', view: 'back', x: 32, y: 95, w: 16, h: 8 },
+]
 
 export default function PatientRecord() {
   const { id } = useParams()
@@ -107,6 +144,34 @@ export default function PatientRecord() {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
     if (intensity >= 5) return 'bg-orange-500 hover:bg-orange-600 text-white'
     return 'bg-green-500 hover:bg-green-600 text-white'
+  }
+
+  const handleRegionClick = async (region: any, existingPoint: any) => {
+    if (existingPoint) {
+      if (existingPoint.notes || existingPoint.pathologies?.length > 0) {
+        setForm({ ...existingPoint, pathologies: existingPoint.pathologies || [] })
+        setIsOpen(true)
+      } else {
+        remove(existingPoint.id)
+      }
+    } else {
+      try {
+        const payload = {
+          patient_id: id,
+          name: region.name,
+          x: region.x,
+          y: region.y,
+          view: region.view,
+          intensity: 5,
+          pathologies: [],
+          notes: '',
+        }
+        await pb.collection('pain_points').create(payload)
+        toast.success(`Ponto ${region.name} mapeado!`)
+      } catch (e) {
+        toast.error('Erro ao adicionar ponto')
+      }
+    }
   }
 
   const load = async () => {
@@ -333,49 +398,47 @@ export default function PatientRecord() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 bg-gradient-to-b from-muted/10 to-muted/30">
-                <div
-                  className="relative aspect-[1/2] max-w-sm mx-auto bg-background/80 backdrop-blur-md border border-border/50 rounded-2xl overflow-hidden cursor-crosshair shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] transition-all duration-300 hover:shadow-[0_0_50px_-15px_rgba(0,0,0,0.2)]"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect()
-                    setForm({
-                      x: ((e.clientX - rect.left) / rect.width) * 100,
-                      y: ((e.clientY - rect.top) / rect.height) * 100,
-                      view,
-                      name: '',
-                      notes: '',
-                      intensity: 5,
-                      pathologies: [],
-                    })
-                    setIsOpen(true)
-                  }}
-                >
-                  <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
+                <div className="relative aspect-[1/2] max-w-sm mx-auto bg-slate-950 border border-border/50 rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] transition-all duration-300">
+                  <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
                   <img
-                    src={`https://img.usecurling.com/p/600/1200?q=professional%20medical%20anatomy%203d%20model%20${view}&color=gray`}
+                    src={`https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20${view}&color=cyan`}
                     alt={`Body ${view}`}
-                    className="w-full h-full object-cover opacity-90 mix-blend-luminosity pointer-events-none transition-opacity duration-500"
+                    className="w-full h-full object-cover mix-blend-screen pointer-events-none opacity-80 transition-opacity duration-500"
                   />
 
-                  {visiblePoints.map((pt: any) => {
+                  {ANATOMY_REGIONS.filter((r) => r.view === view).map((region) => {
+                    const pt = data.points.find((p: any) => p.name === region.name)
+                    const isActive = !!pt
+
+                    const RegionGlow = (
+                      <div
+                        className={cn(
+                          'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
+                          isActive
+                            ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
+                            : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
+                        )}
+                        style={{
+                          left: `${region.x}%`,
+                          top: `${region.y}%`,
+                          width: `${region.w}%`,
+                          height: `${region.h}%`,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRegionClick(region, pt)
+                        }}
+                      />
+                    )
+
+                    if (!isActive)
+                      return <React.Fragment key={region.id}>{RegionGlow}</React.Fragment>
+
                     const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
+
                     return (
-                      <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
-                        <HoverCardTrigger asChild>
-                          <div
-                            className={cn(
-                              'absolute w-7 h-7 rounded-full -ml-3.5 -mt-3.5 border-[3px] border-white dark:border-background flex items-center justify-center text-[10px] font-bold text-white cursor-pointer hover:scale-125 hover:z-20 transition-all duration-300 shadow-md ring-2 ring-transparent hover:ring-primary/50',
-                              getIntensityColor(pt.intensity || 5),
-                            )}
-                            style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setForm({ ...pt, pathologies: pt.pathologies || [] })
-                              setIsOpen(true)
-                            }}
-                          >
-                            {globalIndex + 1}
-                          </div>
-                        </HoverCardTrigger>
+                      <HoverCard key={region.id} openDelay={200} closeDelay={100}>
+                        <HoverCardTrigger asChild>{RegionGlow}</HoverCardTrigger>
                         <HoverCardContent
                           className="w-72 z-50 glass-panel border-border/50 p-4"
                           align="center"
@@ -385,8 +448,15 @@ export default function PatientRecord() {
                           <div className="space-y-3">
                             <div className="flex justify-between items-start">
                               <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
-                                <MapPin className="w-4 h-4 text-primary" />{' '}
-                                {pt.name || 'Ponto não nomeado'}
+                                <div
+                                  className={cn(
+                                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0',
+                                    getIntensityColor(pt.intensity || 5),
+                                  )}
+                                >
+                                  {globalIndex + 1}
+                                </div>
+                                {pt.name}
                               </h4>
                               <Badge
                                 className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
@@ -448,6 +518,77 @@ export default function PatientRecord() {
                       </HoverCard>
                     )
                   })}
+
+                  {/* Render Legacy Points */}
+                  {visiblePoints
+                    .filter((pt: any) => !ANATOMY_REGIONS.some((r) => r.name === pt.name))
+                    .map((pt: any) => {
+                      const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
+                      return (
+                        <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <div
+                              className={cn(
+                                'absolute w-7 h-7 rounded-full -ml-3.5 -mt-3.5 border-[3px] border-white dark:border-background flex items-center justify-center text-[10px] font-bold text-white cursor-pointer hover:scale-125 hover:z-20 transition-all duration-300 shadow-md ring-2 ring-transparent hover:ring-primary/50',
+                                getIntensityColor(pt.intensity || 5),
+                              )}
+                              style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setForm({ ...pt, pathologies: pt.pathologies || [] })
+                                setIsOpen(true)
+                              }}
+                            >
+                              {globalIndex + 1}
+                            </div>
+                          </HoverCardTrigger>
+                          <HoverCardContent
+                            className="w-72 z-50 glass-panel border-border/50 p-4"
+                            align="center"
+                            side="right"
+                            sideOffset={15}
+                          >
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-start">
+                                <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
+                                  <MapPin className="w-4 h-4 text-primary" />{' '}
+                                  {pt.name || 'Ponto não nomeado'}
+                                </h4>
+                                <Badge
+                                  className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
+                                >
+                                  Nível {pt.intensity || 5}
+                                </Badge>
+                              </div>
+                              <div className="pt-2 border-t flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    remove(pt.id)
+                                  }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setForm({ ...pt, pathologies: pt.pathologies || [] })
+                                    setIsOpen(true)
+                                  }}
+                                >
+                                  Editar Detalhes
+                                </Button>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      )
+                    })}
                 </div>
               </CardContent>
             </Card>
