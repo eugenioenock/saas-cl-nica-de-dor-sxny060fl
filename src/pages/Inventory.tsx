@@ -117,7 +117,7 @@ export default function Inventory() {
     is_high_cost: false,
     barcode: '',
   })
-  
+
   const [scannerOpen, setScannerOpen] = useState(false)
 
   const [countModalOpen, setCountModalOpen] = useState(false)
@@ -682,7 +682,12 @@ export default function Inventory() {
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label>Material</Label>
-                <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setScannerOpen(true)}
+                >
                   <ScanBarcode className="w-4 h-4 mr-2" /> Escanear
                 </Button>
               </div>

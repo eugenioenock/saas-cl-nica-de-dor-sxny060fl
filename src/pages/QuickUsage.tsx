@@ -182,7 +182,12 @@ export default function QuickUsage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Material / Lote</Label>
-              <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setScannerOpen(true)}
+              >
                 <ScanBarcode className="w-4 h-4 mr-2" /> Escanear
               </Button>
             </div>

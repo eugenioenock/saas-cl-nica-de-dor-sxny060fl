@@ -12,6 +12,7 @@ import {
   ShieldPlus,
   ShoppingCart,
   Zap,
+  Plug,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -42,7 +43,10 @@ const adminNavItems = [
 
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
 
-const settingsItems = [{ title: 'Configurações', icon: Settings, url: '/settings' }]
+const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
+  { title: 'Configurações', icon: Settings, url: '/settings' },
+  { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
+]
 
 export function AppSidebar() {
   const location = useLocation()
@@ -88,20 +92,23 @@ export function AppSidebar() {
           <SidebarGroup className="mt-auto">
             <SidebarGroupContent>
               <SidebarMenu>
-                {settingsItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={item.title}
-                    >
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {settingsItems.map((item) => {
+                  if (item.adminOnly && user?.role !== 'admin') return null
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location.pathname === item.url}
+                        tooltip={item.title}
+                      >
+                        <Link to={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -39,7 +52,9 @@ export default function ReportsPerformance() {
       if (endDate) apptFilter.push(`start_time <= "${endDate} 23:59:59"`)
 
       const [usages, appts, users] = await Promise.all([
-        pb.collection('inventory_usage').getFullList({ filter: usageFilter.join(' && '), expand: 'batch_id' }),
+        pb
+          .collection('inventory_usage')
+          .getFullList({ filter: usageFilter.join(' && '), expand: 'batch_id' }),
         pb.collection('appointments').getFullList({ filter: apptFilter.join(' && ') }),
         pb.collection('users').getFullList({ filter: 'role = "professional" || role = "admin"' }),
       ])
@@ -77,7 +92,9 @@ export default function ReportsPerformance() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Desempenho e Consumo</h1>
-        <p className="text-muted-foreground">Análise de eficiência do uso de materiais por profissional.</p>
+        <p className="text-muted-foreground">
+          Análise de eficiência do uso de materiais por profissional.
+        </p>
       </div>
 
       <Card>

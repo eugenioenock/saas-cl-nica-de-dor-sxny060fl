@@ -20,6 +20,7 @@ import Insurance from './pages/Insurance'
 import Orders from './pages/Orders'
 import QuickUsage from './pages/QuickUsage'
 import ReportsPerformance from './pages/ReportsPerformance'
+import Integrations from './pages/Integrations'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/reports/performance" element={<ReportsPerformance />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/integrations" element={<Integrations />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

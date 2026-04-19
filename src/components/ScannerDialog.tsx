@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Loader2 } from 'lucide-react'
 
 export function ScannerDialog({
@@ -41,7 +47,7 @@ export function ScannerDialog({
       scannerRef.current = new Html5QrcodeScanner(
         'reader',
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
+        false,
       )
       scannerRef.current.render(
         (text: string) => {
@@ -52,7 +58,7 @@ export function ScannerDialog({
           onScan(text)
           onOpenChange(false)
         },
-        () => {}
+        () => {},
       )
     }
 
