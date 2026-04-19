@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { ProfessionalRanking } from '@/components/dashboard/ProfessionalRanking'
 import { PerformanceInsights } from '@/components/dashboard/performance-insights'
+import { ClinicGamificationWidget } from '@/components/dashboard/ClinicGamificationWidget'
 
 interface DashboardData {
   appointmentsToday: number
@@ -246,6 +247,8 @@ export default function Index() {
       </div>
 
       <PerformanceInsights />
+
+      <ClinicGamificationWidget />
 
       {isManager && (
         <div className="mt-6">

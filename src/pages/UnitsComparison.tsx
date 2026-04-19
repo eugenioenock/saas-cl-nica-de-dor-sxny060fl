@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import { DollarSign, Calendar, Package, TrendingUp, TrendingDown, MapPin } from 'lucide-react'
+import { DollarSign, Calendar, Package, MapPin, Trophy, Award, Medal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Table,
@@ -23,56 +23,47 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { getLevelInfo, BADGE_ICONS } from '@/lib/gamification'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function UnitsComparison() {
   const { user } = useAuth()
-  const [dateRange, setDateRange] = useState('7days')
   const [regionFilter, setRegionFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('xp')
 
   const [finance, setFinance] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
   const [inventory, setInventory] = useState<any[]>([])
   const [clinics, setClinics] = useState<any[]>([])
-  const [professionals, setProfessionals] = useState<any[]>([])
 
   useEffect(() => {
     if (user?.role === 'admin' || user?.role === 'manager') {
       loadData()
     }
-  }, [user, dateRange])
+  }, [user])
 
-  const getStartDate = (range: string) => {
-    const d = new Date()
-    if (range === 'today') {
-      d.setHours(0, 0, 0, 0)
-    } else if (range === '7days') {
-      d.setDate(d.getDate() - 7)
-    } else if (range === 'mtd') {
-      d.setDate(1)
-      d.setHours(0, 0, 0, 0)
-    }
-    return d.toISOString().replace('T', ' ').substring(0, 19)
-  }
+  useRealtime('clinic_settings', () => {
+    loadData()
+  })
 
   const loadData = async () => {
     try {
+      // Trigger backend to refresh gamification calculations silently
+      await pb.send('/backend/v1/gamification/refresh', { method: 'POST' }).catch(() => {})
+
       const clinicsData = await pb.collection('clinic_settings').getFullList()
       setClinics(clinicsData)
 
-      const filter = dateRange === 'all' ? '' : `created >= "${getStartDate(dateRange)}"`
-      const apptFilter = dateRange === 'all' ? '' : `start_time >= "${getStartDate(dateRange)}"`
-
-      const [fin, appts, inv, profs] = await Promise.all([
-        pb.collection('consultations_finance').getFullList({ filter }),
-        pb.collection('appointments').getFullList({ filter: apptFilter }),
+      const [fin, appts, inv] = await Promise.all([
+        pb.collection('consultations_finance').getFullList(),
+        pb.collection('appointments').getFullList(),
         pb.collection('clinical_inventory').getFullList({ filter: 'is_high_cost = true' }),
-        pb.collection('users').getFullList({ filter: "role = 'professional'" }),
       ])
 
       setFinance(fin)
       setAppointments(appts)
       setInventory(inv)
-      setProfessionals(profs)
     } catch (e) {
       console.error(e)
     }
@@ -84,85 +75,72 @@ export default function UnitsComparison() {
     return Array.from(set).sort()
   }, [clinics])
 
-  const { chartData, benchmarkingData } = useMemo(() => {
+  const chartData = useMemo(() => {
     const filteredClinics = clinics.filter(
       (c) => regionFilter === 'all' || c.region === regionFilter,
     )
 
-    const cData = filteredClinics.map((clinic) => {
-      const clinicId = clinic.id
-      const clinicFinance = finance.filter((f) => f.clinic_id === clinicId)
-      const revenue = clinicFinance.reduce((sum, f) => sum + (f.amount || 0), 0)
+    return filteredClinics
+      .map((clinic) => {
+        const clinicId = clinic.id
+        const revenue = finance
+          .filter((f) => f.clinic_id === clinicId)
+          .reduce((sum, f) => sum + (f.amount || 0), 0)
+        const apptCount = appointments.filter((a) => a.clinic_id === clinicId).length
+        const highCostItems = inventory
+          .filter((i) => i.clinic_id === clinicId)
+          .reduce((sum, i) => sum + (i.current_quantity || 0), 0)
 
-      const clinicAppts = appointments.filter((a) => a.clinic_id === clinicId)
-      const apptCount = clinicAppts.length
-      const completedAppts = clinicAppts.filter((a) => a.status === 'completed').length
-
-      const clinicInv = inventory.filter((i) => i.clinic_id === clinicId)
-      const highCostItems = clinicInv.reduce((sum, i) => sum + (i.current_quantity || 0), 0)
-
-      const clinicProfs = professionals.filter((p) => p.clinic_id === clinicId)
-      const profCount = clinicProfs.length || 1
-
-      const config = clinic.bonus_config || { revenue_percentage: 0 }
-      const avgBonus = (revenue * (config.revenue_percentage / 100)) / profCount
-
-      const efficiency = apptCount > 0 ? (completedAppts / apptCount) * 100 : 0
-      const score = Math.min(efficiency * 0.4 + (revenue > 0 ? 60 : 0), 100)
-
-      return {
-        id: clinicId,
-        name: clinic.name,
-        region: clinic.region || '-',
-        revenue,
-        appointments: apptCount,
-        highCostItems,
-        avgBonus,
-        score,
-        profCount,
-      }
-    })
-
-    const totalAvgBonus = cData.reduce((s, c) => s + c.avgBonus, 0) / (cData.length || 1)
-    const totalAvgScore = cData.reduce((s, c) => s + c.score, 0) / (cData.length || 1)
-
-    const bData = cData
-      .map((c) => {
-        const bonusDiff = totalAvgBonus > 0 ? (c.avgBonus - totalAvgBonus) / totalAvgBonus : 0
-        const scoreDiff = totalAvgScore > 0 ? (c.score - totalAvgScore) / totalAvgScore : 0
-        return { ...c, bonusDiff, scoreDiff }
+        return {
+          id: clinicId,
+          name: clinic.name,
+          revenue,
+          appointments: apptCount,
+          highCostItems,
+          xp: clinic.xp || 0,
+          level: clinic.level || 1,
+          tier: clinic.tier || 'Bronze',
+          badges: Array.isArray(clinic.badges) ? clinic.badges : [],
+        }
       })
-      .sort((a, b) => b.score - a.score)
-
-    return {
-      chartData: cData,
-      benchmarkingData: {
-        clinics: bData,
-        regionalAvgBonus: totalAvgBonus,
-        regionalAvgScore: totalAvgScore,
-      },
-    }
-  }, [clinics, finance, appointments, inventory, professionals, regionFilter])
+      .sort((a, b) => {
+        if (sortBy === 'xp') return b.xp - a.xp
+        if (sortBy === 'level') return b.level - a.level
+        if (sortBy === 'revenue') return b.revenue - a.revenue
+        return 0
+      })
+  }, [clinics, finance, appointments, inventory, regionFilter, sortBy])
 
   if (user?.role !== 'admin' && user?.role !== 'manager') {
     return <Navigate to="/dashboard" replace />
   }
 
-  const chartConfigRevenue = { revenue: { label: 'Receita (R$)', color: 'hsl(var(--chart-1))' } }
-  const chartConfigAppts = { appointments: { label: 'Consultas', color: 'hsl(var(--chart-2))' } }
-  const chartConfigInv = {
-    highCostItems: { label: 'Itens Alto Custo', color: 'hsl(var(--chart-3))' },
+  const chartConfigRevenue = { revenue: { label: 'Receita Total', color: 'hsl(var(--chart-1))' } }
+
+  const getRankStyle = (index: number) => {
+    if (index === 0)
+      return 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.3)] bg-yellow-50/10'
+    if (index === 1)
+      return 'border-slate-300 shadow-[0_0_15px_rgba(148,163,184,0.3)] bg-slate-50/10'
+    if (index === 2)
+      return 'border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.2)] bg-orange-50/10'
+    return ''
+  }
+
+  const getRankIcon = (index: number) => {
+    if (index === 0) return <Trophy className="w-5 h-5 text-yellow-500" />
+    if (index === 1) return <Medal className="w-5 h-5 text-slate-400" />
+    if (index === 2) return <Medal className="w-5 h-5 text-orange-500" />
+    return <span className="font-bold text-muted-foreground w-5 text-center">{index + 1}</span>
   }
 
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-            Comparativo e Benchmarking
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Ranking Regional</h1>
           <p className="text-muted-foreground text-sm md:text-base">
-            Analise o desempenho da rede e compare as unidades.
+            Gamificação e desempenho operacional das unidades.
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -173,7 +151,7 @@ export default function UnitsComparison() {
                 <SelectValue placeholder="Região" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todas as Regiões</SelectItem>
                 {regions.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -182,29 +160,28 @@ export default function UnitsComparison() {
               </SelectContent>
             </Select>
           )}
-          <Select value={dateRange} onValueChange={setDateRange}>
+          <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-[140px] md:w-[160px]">
-              <SelectValue placeholder="Período" />
+              <SelectValue placeholder="Ordenar por" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today">Hoje</SelectItem>
-              <SelectItem value="7days">Últimos 7 dias</SelectItem>
-              <SelectItem value="mtd">Este mês</SelectItem>
-              <SelectItem value="all">Todo o período</SelectItem>
+              <SelectItem value="xp">Maior XP</SelectItem>
+              <SelectItem value="level">Maior Nível</SelectItem>
+              <SelectItem value="revenue">Maior Receita</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-3">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-emerald-500" /> Receita
+              <DollarSign className="w-5 h-5 text-emerald-500" /> Receita Global vs Unidades
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfigRevenue} className="h-[250px] w-full">
+            <ChartContainer config={chartConfigRevenue} className="h-[200px] w-full">
               <BarChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
@@ -225,181 +202,153 @@ export default function UnitsComparison() {
             </ChartContainer>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-500" /> Consultas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfigAppts} className="h-[250px] w-full">
-              <BarChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar
-                  dataKey="appointments"
-                  fill="var(--color-appointments)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2 xl:col-span-1">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="w-5 h-5 text-orange-500" /> Estoque (Alto Custo)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfigInv} className="h-[250px] w-full">
-              <BarChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar
-                  dataKey="highCostItems"
-                  fill="var(--color-highCostItems)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Benchmarking Regional</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-primary" />
+            Leaderboard de Clínicas
+          </CardTitle>
           <CardDescription>
-            Análise detalhada de performance por unidade. Valores com variação acima de 20% da média
-            regional são destacados.
+            Classificação baseada em Experience Points (XP) gerados por faturamento e satisfação dos
+            pacientes.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 p-4 bg-muted/30 rounded-lg border">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium uppercase">Média Score</p>
-              <p className="text-xl sm:text-2xl font-bold">
-                {benchmarkingData.regionalAvgScore.toFixed(1)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium uppercase">
-                Média Bônus/Prof
-              </p>
-              <p className="text-xl sm:text-2xl font-bold">
-                R${' '}
-                {benchmarkingData.regionalAvgBonus.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-            <div className="col-span-2 flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200">
-                  Alta
-                </Badge>{' '}
-                +20% que a média
-              </span>
-              <span className="flex items-center gap-1">
-                <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200">
-                  Baixa
-                </Badge>{' '}
-                -20% que a média
-              </span>
-            </div>
+          {/* Mobile Cards View */}
+          <div className="md:hidden space-y-4">
+            {chartData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhuma clínica encontrada.</p>
+            ) : (
+              chartData.map((item, index) => {
+                const lvl = getLevelInfo(item.xp)
+                return (
+                  <Card
+                    key={item.id}
+                    className={cn('overflow-hidden transition-all', getRankStyle(index))}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                            {getRankIcon(index)}
+                          </div>
+                          <div className="font-semibold">{item.name}</div>
+                        </div>
+                        <Badge variant="outline" className={lvl.color}>
+                          {item.tier} (Lv {item.level})
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-1.5 mb-4">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{item.xp} XP</span>
+                          <span>Próximo: {lvl.nextXp} XP</span>
+                        </div>
+                        <Progress value={lvl.progress} className="h-2" />
+                      </div>
+
+                      {item.badges.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {item.badges
+                            .slice(-3)
+                            .reverse()
+                            .map((b: any) => {
+                              const Icon = BADGE_ICONS[b.icon] || Award
+                              return (
+                                <Badge
+                                  key={b.id}
+                                  variant="secondary"
+                                  className="text-[10px] py-0 px-1.5 h-5 bg-background"
+                                >
+                                  <Icon className="w-3 h-3 mr-1 text-amber-500" /> {b.name}
+                                </Badge>
+                              )
+                            })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
           </div>
 
-          <div className="rounded-md border overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block rounded-md border overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-16 text-center">Rank</TableHead>
                   <TableHead>Unidade</TableHead>
-                  <TableHead className="hidden md:table-cell">Região</TableHead>
+                  <TableHead>Nível & Tier</TableHead>
+                  <TableHead className="w-1/4">Progresso XP</TableHead>
+                  <TableHead>Conquistas Recentes</TableHead>
                   <TableHead className="text-right">Receita Total</TableHead>
-                  <TableHead className="text-center">Score Médio</TableHead>
-                  <TableHead className="text-right">Bônus Médio/Prof</TableHead>
-                  <TableHead className="text-center hidden sm:table-cell">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {benchmarkingData.clinics.length === 0 ? (
+                {chartData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
-                      Nenhuma unidade encontrada para os filtros selecionados.
+                      Nenhuma clínica encontrada para os filtros selecionados.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  benchmarkingData.clinics.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{item.name}</TableCell>
-                      <TableCell className="hidden md:table-cell text-muted-foreground">
-                        {item.region}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        R$ {item.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <span
-                            className={cn(
-                              'font-bold',
-                              item.scoreDiff > 0.2
-                                ? 'text-emerald-600'
-                                : item.scoreDiff < -0.2
-                                  ? 'text-red-600'
-                                  : '',
-                            )}
-                          >
-                            {item.score.toFixed(1)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
-                          <span
-                            className={cn(
-                              'font-bold',
-                              item.bonusDiff > 0.2
-                                ? 'text-emerald-600'
-                                : item.bonusDiff < -0.2
-                                  ? 'text-red-600'
-                                  : '',
-                            )}
-                          >
-                            R$ {item.avgBonus.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center hidden sm:table-cell">
-                        {item.bonusDiff > 0.2 ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-emerald-500/10 text-emerald-600 border-emerald-200"
-                          >
-                            <TrendingUp className="h-3 w-3 mr-1" /> Acima
+                  chartData.map((item, index) => {
+                    const lvl = getLevelInfo(item.xp)
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={cn('transition-all duration-300', getRankStyle(index))}
+                      >
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">{getRankIcon(index)}</div>
+                        </TableCell>
+                        <TableCell className="font-semibold">{item.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={lvl.color}>
+                            {item.tier} • Lv {item.level}
                           </Badge>
-                        ) : item.bonusDiff < -0.2 ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-red-500/10 text-red-600 border-red-200"
-                          >
-                            <TrendingDown className="h-3 w-3 mr-1" /> Abaixo
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Na Média</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5 w-full pr-4">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{item.xp} XP</span>
+                              <span>{lvl.nextXp} XP</span>
+                            </div>
+                            <Progress value={lvl.progress} className="h-2" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1.5">
+                            {item.badges.length === 0 && (
+                              <span className="text-xs text-muted-foreground">Nenhuma ainda</span>
+                            )}
+                            {item.badges
+                              .slice(-3)
+                              .reverse()
+                              .map((b: any) => {
+                                const Icon = BADGE_ICONS[b.icon] || Award
+                                return (
+                                  <Badge
+                                    key={b.id}
+                                    variant="secondary"
+                                    className="text-xs py-0 h-6 bg-background/80 border whitespace-nowrap"
+                                  >
+                                    <Icon className="w-3.5 h-3.5 mr-1.5 text-amber-500" /> {b.name}
+                                  </Badge>
+                                )
+                              })}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          R$ {item.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
