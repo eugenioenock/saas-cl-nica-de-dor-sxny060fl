@@ -29,10 +29,6 @@ export default function UnitsComparison() {
     }
   }, [user, dateRange])
 
-  if (user?.role !== 'admin' && user?.role !== 'manager') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   const getStartDate = (range: string) => {
     const d = new Date()
     if (range === 'today') {
@@ -87,6 +83,10 @@ export default function UnitsComparison() {
       }
     })
   }, [clinics, finance, appointments, inventory])
+
+  if (user?.role !== 'admin' && user?.role !== 'manager') {
+    return <Navigate to="/dashboard" replace />
+  }
 
   const chartConfigRevenue = { revenue: { label: 'Receita (R$)', color: 'hsl(var(--chart-1))' } }
   const chartConfigAppts = { appointments: { label: 'Consultas', color: 'hsl(var(--chart-2))' } }
