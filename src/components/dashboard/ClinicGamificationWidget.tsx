@@ -17,7 +17,9 @@ export function ClinicGamificationWidget() {
     try {
       const data = await pb.collection('clinic_settings').getOne(user.clinic_id)
       setClinic(data)
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to load clinic gamification data', e)
+    }
   }
 
   useEffect(() => {
