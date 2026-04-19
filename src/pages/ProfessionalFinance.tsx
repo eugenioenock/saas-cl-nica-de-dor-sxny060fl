@@ -45,7 +45,10 @@ export default function ProfessionalFinance() {
           .replace('T', ' ')
       }
 
-      const [appointments, finance, notes, clinic] = await Promise.all([
+      const d = new Date(start)
+      const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+      const [appointments, finance, notes, clinic, profGoalsResponse] = await Promise.all([
         pb.collection('appointments').getFullList({
           filter: `start_time >= "${start}" && start_time <= "${end}" && clinic_id = "${user.clinic_id}"`,
         }),
@@ -56,10 +59,17 @@ export default function ProfessionalFinance() {
           filter: `created >= "${start}" && created <= "${end}" && clinic_id = "${user.clinic_id}"`,
         }),
         pb.collection('clinic_settings').getOne(user.clinic_id),
+        pb
+          .collection('professional_goals')
+          .getList(1, 1, {
+            filter: `professional_id = "${user.id}" && month = "${monthStr}"`,
+          })
+          .catch(() => null),
       ])
 
       const config = clinic.bonus_config || { revenue_percentage: 0, performance_thresholds: [] }
       setBonusConfig(config)
+      const profGoal = profGoalsResponse?.items?.[0]
 
       const financeByProf = new Map<string, number>()
       const paidFinanceByProf = new Map<string, number>()
@@ -108,17 +118,40 @@ export default function ProfessionalFinance() {
       const effScore = (myEfficiency / 100) * 30
       const score = revScore + volScore + effScore
 
-      const revenueShare = myPaidRevenue * (config.revenue_percentage / 100)
+      let estimatedBonus = 0
+      let nextTier = null
+      let currentTier = null
+      let isTiered = false
 
-      let multiplier = 1
-      const thresholds = [...(config.performance_thresholds || [])].sort(
-        (a, b) => b.min_score - a.min_score,
-      )
-      const matchedThreshold = thresholds.find((t: any) => score >= t.min_score)
-      if (matchedThreshold) multiplier = matchedThreshold.multiplier
+      if (profGoal && profGoal.commission_tiers && profGoal.commission_tiers.length > 0) {
+        isTiered = true
+        let remainingRevenue = myPaidRevenue
+        const sortedTiers = [...profGoal.commission_tiers].sort((a, b) => a.min - b.min)
 
-      const estimatedBonus = revenueShare * multiplier
-      const nextThreshold = [...thresholds].reverse().find((t) => t.min_score > score)
+        for (let i = 0; i < sortedTiers.length; i++) {
+          const t = sortedTiers[i]
+          const max = t.max || Infinity
+          if (myPaidRevenue >= t.min) {
+            currentTier = t
+            const revenueInTier = Math.min(myPaidRevenue, max) - t.min
+            if (revenueInTier > 0) {
+              estimatedBonus += revenueInTier * (t.rate / 100)
+            }
+          }
+        }
+        nextTier = sortedTiers.find((t) => t.min > myPaidRevenue)
+      } else {
+        const revenueShare = myPaidRevenue * (config.revenue_percentage / 100)
+        let multiplier = 1
+        const thresholds = [...(config.performance_thresholds || [])].sort(
+          (a, b) => b.min_score - a.min_score,
+        )
+        const matchedThreshold = thresholds.find((t: any) => score >= t.min_score)
+        if (matchedThreshold) multiplier = matchedThreshold.multiplier
+
+        estimatedBonus = revenueShare * multiplier
+        nextTier = [...thresholds].reverse().find((t) => t.min_score > score)
+      }
 
       setStats({
         revenue: myRevenue,
@@ -126,14 +159,12 @@ export default function ProfessionalFinance() {
         volume: myCompleted,
         efficiency: myEfficiency,
         score,
-        revenueShare,
-        multiplier,
         estimatedBonus,
-        nextThreshold,
-        thresholds,
-        revScore,
-        volScore,
-        effScore,
+        nextTier,
+        currentTier,
+        isTiered,
+        profGoal,
+        thresholds: config.performance_thresholds || [],
       })
     } catch (err) {
       console.error(err)
@@ -156,10 +187,10 @@ export default function ProfessionalFinance() {
     )
   }
 
-  const progressToNext = stats?.nextThreshold
-    ? (stats.score / stats.nextThreshold.min_score) * 100
-    : 100
+  const progressToNext =
+    stats?.nextTier && !stats.isTiered ? (stats.score / stats.nextTier.min_score) * 100 : 100
   const isTopPerformer =
+    !stats?.isTiered &&
     stats?.multiplier > 1 &&
     stats?.multiplier === Math.max(...(stats?.thresholds.map((t: any) => t.multiplier) || [1]))
 
@@ -236,7 +267,7 @@ export default function ProfessionalFinance() {
           <div className="absolute right-0 top-0 w-24 h-24 bg-primary/10 rounded-bl-full -z-0 translate-x-4 -translate-y-4"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 md:px-6 pt-4 md:pt-6 relative z-10">
             <CardTitle className="text-sm font-bold uppercase text-primary">
-              Bônus Estimado
+              Comissão / Bônus
             </CardTitle>
             <div className="p-2 bg-primary/20 rounded-full">
               <Award className="h-4 w-4 text-primary" />
@@ -244,14 +275,23 @@ export default function ProfessionalFinance() {
           </CardHeader>
           <CardContent className="px-4 md:px-6 pb-4 md:pb-6 relative z-10">
             <div className="text-3xl md:text-4xl font-black text-primary tracking-tight">
-              R$ {stats?.estimatedBonus.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+              R$ {stats?.estimatedBonus.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-primary/80 font-medium mt-1 pt-2 mt-2">
-              Múltiplo Atual:{' '}
-              <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-1">
-                {stats?.multiplier}x
-              </span>
-            </p>
+            {stats?.isTiered ? (
+              <p className="text-xs text-primary/80 font-medium mt-1 pt-2 mt-2">
+                Faixa Atual:{' '}
+                <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-1">
+                  {stats?.currentTier ? `${stats.currentTier.rate}%` : '0%'}
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-primary/80 font-medium mt-1 pt-2 mt-2">
+                Múltiplo Atual:{' '}
+                <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-1">
+                  {stats?.multiplier}x
+                </span>
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -264,78 +304,154 @@ export default function ProfessionalFinance() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 space-y-6">
-            {isTopPerformer ? (
-              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gradient-to-b from-amber-50 to-transparent dark:from-amber-950/20 dark:to-transparent rounded-xl border border-amber-200/50 dark:border-amber-900/50">
-                <div className="bg-amber-100 dark:bg-amber-900/40 p-3 rounded-full mb-2">
-                  <Star className="h-10 w-10 text-amber-500 fill-amber-500 animate-pulse" />
+            {stats?.isTiered ? (
+              <div className="space-y-6">
+                <div className="space-y-3 bg-card p-4 rounded-xl border shadow-sm">
+                  <div className="flex justify-between text-sm items-end mb-2">
+                    <div>
+                      <span className="font-semibold text-foreground flex items-center gap-1">
+                        <Target className="h-3.5 w-3.5 text-primary" /> Meta Base (Mensal)
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-lg">
+                        R$ {stats.paidRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {' '}
+                        / R${' '}
+                        {stats.profGoal.base_goal.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 0,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <Progress
+                    value={(stats.paidRevenue / (stats.profGoal.base_goal || 1)) * 100}
+                    className="h-3"
+                  />
+                  {stats.nextTier && (
+                    <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5 leading-relaxed">
+                      <Activity className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-500" />
+                      Faltam R$ {(stats.nextTier.min - stats.paidRevenue).toLocaleString(
+                        'pt-BR',
+                      )}{' '}
+                      para a faixa de {stats.nextTier.rate}%.
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-black text-xl text-amber-700 dark:text-amber-500">
-                    Nível Máximo Atingido!
-                  </h3>
-                  <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1 max-w-[250px] mx-auto">
-                    Excelente trabalho. Você está maximizando seus retornos operacionais este mês.
-                  </p>
+
+                <div className="pt-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">
+                    Faixas de Comissão
+                  </h4>
+                  <div className="space-y-1.5">
+                    {stats.profGoal.commission_tiers.map((t: any, i: number) => {
+                      const isActive = stats.currentTier?.min === t.min
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            'flex justify-between items-center px-4 py-3 rounded-lg text-sm transition-colors border',
+                            isActive
+                              ? 'bg-primary/10 border-primary/20 font-bold text-primary shadow-sm ring-1 ring-primary/10'
+                              : 'bg-muted/10 border-transparent text-muted-foreground hover:bg-muted/30',
+                          )}
+                        >
+                          <span className="flex items-center gap-2">
+                            Acima de R$ {t.min.toLocaleString('pt-BR')}
+                          </span>
+                          <span
+                            className={cn(
+                              'text-base',
+                              isActive
+                                ? 'bg-primary text-primary-foreground px-2 py-0.5 rounded-md'
+                                : '',
+                            )}
+                          >
+                            {t.rate}%
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 bg-card p-4 rounded-xl border shadow-sm">
-                <div className="flex justify-between text-sm items-end mb-2">
-                  <div>
-                    <span className="font-semibold text-foreground flex items-center gap-1">
-                      <Target className="h-3.5 w-3.5 text-primary" /> Próximo Nível:{' '}
-                      {stats?.nextThreshold?.multiplier}x
-                    </span>
+              <div className="space-y-6">
+                {isTopPerformer ? (
+                  <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gradient-to-b from-amber-50 to-transparent dark:from-amber-950/20 dark:to-transparent rounded-xl border border-amber-200/50 dark:border-amber-900/50">
+                    <div className="bg-amber-100 dark:bg-amber-900/40 p-3 rounded-full mb-2">
+                      <Star className="h-10 w-10 text-amber-500 fill-amber-500 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-xl text-amber-700 dark:text-amber-500">
+                        Nível Máximo Atingido!
+                      </h3>
+                      <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1 max-w-[250px] mx-auto">
+                        Excelente trabalho. Você está maximizando seus retornos operacionais este
+                        mês.
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-bold text-lg">{stats?.score.toFixed(1)}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {' '}
-                      / {stats?.nextThreshold?.min_score} pts
-                    </span>
+                ) : (
+                  <div className="space-y-3 bg-card p-4 rounded-xl border shadow-sm">
+                    <div className="flex justify-between text-sm items-end mb-2">
+                      <div>
+                        <span className="font-semibold text-foreground flex items-center gap-1">
+                          <Target className="h-3.5 w-3.5 text-primary" /> Próximo Nível:{' '}
+                          {stats?.nextTier?.multiplier}x
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-lg">{stats?.score.toFixed(1)}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {' '}
+                          / {stats?.nextTier?.min_score} pts
+                        </span>
+                      </div>
+                    </div>
+                    <Progress value={progressToNext} className="h-3" />
+                    <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5 leading-relaxed">
+                      <Activity className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-500" />
+                      Conclua mais consultas sem cancelamentos para aumentar sua Eficiência e
+                      Volume.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">
+                    Tabela de Múltiplos
+                  </h4>
+                  <div className="space-y-1.5">
+                    {stats?.thresholds.map((t: any, i: number) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          'flex justify-between items-center px-4 py-3 rounded-lg text-sm transition-colors border',
+                          stats?.multiplier === t.multiplier
+                            ? 'bg-primary/10 border-primary/20 font-bold text-primary shadow-sm ring-1 ring-primary/10'
+                            : 'bg-muted/10 border-transparent text-muted-foreground hover:bg-muted/30',
+                        )}
+                      >
+                        <span className="flex items-center gap-2">Score {t.min_score}+</span>
+                        <span
+                          className={cn(
+                            'text-base',
+                            stats?.multiplier === t.multiplier
+                              ? 'bg-primary text-primary-foreground px-2 py-0.5 rounded-md'
+                              : '',
+                          )}
+                        >
+                          {t.multiplier}x
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <Progress value={progressToNext} className="h-3" />
-                <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5 leading-relaxed">
-                  <Activity className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-500" />
-                  Conclua mais consultas sem cancelamentos para aumentar sua Eficiência e Volume.
-                </p>
               </div>
             )}
-
-            <div className="pt-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">
-                Tabela de Múltiplos
-              </h4>
-              <div className="space-y-1.5">
-                {stats?.thresholds.map((t: any, i: number) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex justify-between items-center px-4 py-3 rounded-lg text-sm transition-colors border',
-                      stats?.multiplier === t.multiplier
-                        ? 'bg-primary/10 border-primary/20 font-bold text-primary shadow-sm ring-1 ring-primary/10'
-                        : 'bg-muted/10 border-transparent text-muted-foreground hover:bg-muted/30',
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      {stats?.multiplier === t.multiplier && <CheckCheck className="h-4 w-4" />}
-                      Score {t.min_score}+
-                    </span>
-                    <span
-                      className={cn(
-                        'text-base',
-                        stats?.multiplier === t.multiplier
-                          ? 'bg-primary text-primary-foreground px-2 py-0.5 rounded-md'
-                          : '',
-                      )}
-                    >
-                      {t.multiplier}x
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 

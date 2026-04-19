@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ProfessionalGoalDialog } from '@/components/settings/ProfessionalGoalDialog'
 
 export default function Settings() {
   const { activeClinic } = useAppContext()
@@ -24,6 +25,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [newPathology, setNewPathology] = useState('')
 
+  const [dbUsers, setDbUsers] = useState<any[]>([])
   const [settingsId, setSettingsId] = useState('')
   const [clinicSettings, setClinicSettings] = useState({
     name: '',
@@ -52,6 +54,16 @@ export default function Settings() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadUsers = async () => {
+    if (!activeClinic?.id) return
+    try {
+      const records = await pb
+        .collection('users')
+        .getFullList({ filter: `clinic_id = "${activeClinic.id}"` })
+      setDbUsers(records)
+    } catch (e) {}
   }
 
   const loadClinicSettings = async () => {
@@ -87,6 +99,10 @@ export default function Settings() {
     loadPathologies()
     loadClinicSettings()
   }, [])
+
+  useEffect(() => {
+    loadUsers()
+  }, [activeClinic?.id])
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -474,29 +490,27 @@ export default function Settings() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {users.map((user) => (
+              {dbUsers.map((u) => (
                 <div
-                  key={user.id}
+                  key={u.id}
                   className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <Avatar>
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {user.name.charAt(0)}
+                        {u.name?.charAt(0) || u.email?.charAt(0) || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium leading-none">{user.name}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+                      <p className="font-medium leading-none">{u.name || 'Sem Nome'}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{u.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Badge variant={user.role === 'Doctor' ? 'default' : 'secondary'}>
-                      {user.role}
+                    <Badge variant={u.role === 'professional' ? 'default' : 'secondary'}>
+                      {u.role}
                     </Badge>
-                    <Button variant="ghost" size="sm">
-                      Editar
-                    </Button>
+                    {activeClinic && <ProfessionalGoalDialog user={u} clinicId={activeClinic.id} />}
                   </div>
                 </div>
               ))}

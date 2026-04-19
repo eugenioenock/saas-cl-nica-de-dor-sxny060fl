@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T18:13:17.093Z",
+  "generatedAt": "2026-04-19T18:19:48.436Z",
   "collections": [
     {
       "name": "users",
@@ -1680,6 +1680,75 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_notifications_user_read ON notifications (user_id, is_read)"]
+    },
+    {
+      "name": "professional_goals",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin' || @request.auth.role = 'manager' || professional_id = @request.auth.id",
+        "view": "@request.auth.role = 'admin' || @request.auth.role = 'manager' || professional_id = @request.auth.id",
+        "create": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "update": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "delete": "@request.auth.role = 'admin' || @request.auth.role = 'manager'"
+      },
+      "fields": [
+        {
+          "name": "professional_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "base_goal",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "commission_tiers",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["active", "completed"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_prof_goals_prof_month ON professional_goals (professional_id, month)"
+      ]
     }
   ]
 }
