@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react'
+import { ProfessionalRanking } from '@/components/dashboard/ProfessionalRanking'
 
 interface DashboardData {
   appointmentsToday: number
@@ -242,6 +243,12 @@ export default function Index() {
           </>
         )}
       </div>
+
+      {isManager && (
+        <div className="mt-6">
+          <ProfessionalRanking />
+        </div>
+      )}
 
       <Card className="mt-6 border-dashed bg-muted/30">
         <CardContent className="flex flex-col items-center justify-center p-10 text-center space-y-3">
