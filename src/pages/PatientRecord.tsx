@@ -66,21 +66,21 @@ import React from 'react'
 import bodyImage from '@/assets/corpo-humano-a2474.jpg'
 
 const ANATOMY_REGIONS = [
-  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 12, w: 10, h: 8 },
-  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 25, w: 14, h: 12 },
-  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 42, w: 16, h: 10 },
-  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'back', x: 32, y: 20, w: 12, h: 10 },
-  { id: 'ombro_dir', name: 'Ombro Direito', view: 'back', x: 68, y: 20, w: 12, h: 10 },
-  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'back', x: 22, y: 40, w: 10, h: 8 },
-  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'back', x: 78, y: 40, w: 10, h: 8 },
-  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 15, y: 52, w: 8, h: 8 },
-  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 85, y: 52, w: 8, h: 8 },
-  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'back', x: 42, y: 52, w: 12, h: 12 },
-  { id: 'quadril_dir', name: 'Quadril Direito', view: 'back', x: 58, y: 52, w: 12, h: 12 },
-  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 42, y: 75, w: 10, h: 10 },
-  { id: 'joelho_dir', name: 'Joelho Direito', view: 'back', x: 58, y: 75, w: 10, h: 10 },
-  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'back', x: 42, y: 95, w: 10, h: 8 },
-  { id: 'pe_dir', name: 'Pé Direito', view: 'back', x: 58, y: 95, w: 10, h: 8 },
+  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 15, w: 10, h: 8 },
+  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 12, h: 14 },
+  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 44, w: 14, h: 12 },
+  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'back', x: 34, y: 20, w: 12, h: 10 },
+  { id: 'ombro_dir', name: 'Ombro Direito', view: 'back', x: 66, y: 20, w: 12, h: 10 },
+  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'back', x: 23, y: 38, w: 10, h: 10 },
+  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'back', x: 77, y: 38, w: 10, h: 10 },
+  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 14, y: 50, w: 8, h: 10 },
+  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 86, y: 50, w: 8, h: 10 },
+  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 54, w: 14, h: 14 },
+  { id: 'quadril_dir', name: 'Quadril Direito', view: 'back', x: 62, y: 54, w: 14, h: 14 },
+  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 39, y: 74, w: 12, h: 12 },
+  { id: 'joelho_dir', name: 'Joelho Direito', view: 'back', x: 61, y: 74, w: 12, h: 12 },
+  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'back', x: 41, y: 94, w: 10, h: 8 },
+  { id: 'pe_dir', name: 'Pé Direito', view: 'back', x: 59, y: 94, w: 10, h: 8 },
 ]
 
 export default function PatientRecord() {
