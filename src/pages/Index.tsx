@@ -1,535 +1,228 @@
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as RechartsTooltip,
-} from 'recharts'
-import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart'
+import { useState, useEffect } from 'react'
 import pb from '@/lib/pocketbase/client'
-import { useRealtime } from '@/hooks/use-realtime'
-import { Link } from 'react-router-dom'
-import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
+  Settings2,
+  DollarSign,
+  AlertTriangle,
+  Calendar,
+  MessageSquare,
   Loader2,
-  AlertCircle,
-  ShoppingCart,
-  Users,
-  CalendarCheck,
-  TrendingUp,
-  Activity,
-  Star,
-  ShieldAlert,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+
+interface DashboardPrefs {
+  visibleWidgets: string[]
+}
 
 export default function Index() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [kpis, setKpis] = useState({
-    totalPatients: 0,
-    totalAppointments: 0,
-    totalRevenue: 0,
-    pendingRevenue: 0,
+  const [prefs, setPrefs] = useState<DashboardPrefs>({
+    visibleWidgets: ['finance', 'inventory', 'appointments', 'feedbacks'],
   })
-  const [performanceData, setPerformanceData] = useState<any[]>([])
-  const [satisfaction, setSatisfaction] = useState(0)
-  const [insurancePending, setInsurancePending] = useState(0)
-  const [abcData, setAbcData] = useState<any[]>([])
-  const [criticalStock, setCriticalStock] = useState<any[]>([])
-  const [recentCounts, setRecentCounts] = useState<any[]>([])
+  const [stats, setStats] = useState({
+    revenue: 0,
+    lowStock: 0,
+    appointmentsCount: 0,
+    feedbacksCount: 0,
+  })
 
-  const loadData = async () => {
-    try {
-      const [
-        patients,
-        appointments,
-        finances,
-        usersRes,
-        feedbacks,
-        usageRecords,
-        inventoryRes,
-        countsRes,
-      ] = await Promise.all([
-        pb.collection('patients').getFullList(),
-        pb.collection('appointments').getFullList(),
-        pb.collection('consultations_finance').getFullList({ expand: 'medical_note_id' }),
-        pb.collection('users').getFullList(),
-        pb.collection('feedbacks').getFullList(),
-        pb.collection('inventory_usage').getFullList({ expand: 'batch_id.material_id' }),
-        pb.collection('clinical_inventory').getFullList(),
-        pb
-          .collection('inventory_counts')
-          .getList(1, 10, { sort: '-created', expand: 'material_id,professional_id' }),
-      ])
+  useEffect(() => {
+    if (user?.settings?.visibleWidgets) {
+      setPrefs({ visibleWidgets: user.settings.visibleWidgets })
+    }
 
-      setRecentCounts(countsRes.items)
+    const loadStats = async () => {
+      try {
+        const [finance, inventory, appointments, feedbacks] = await Promise.all([
+          pb
+            .collection('consultations_finance')
+            .getFullList({ filter: `status='paid'`, requestKey: null }),
+          pb
+            .collection('clinical_inventory')
+            .getList(1, 1, { filter: `current_quantity <= min_quantity`, requestKey: null }),
+          pb
+            .collection('appointments')
+            .getList(1, 1, { filter: `status='scheduled'`, requestKey: null }),
+          pb.collection('feedbacks').getList(1, 1, { requestKey: null }),
+        ])
 
-      if (feedbacks.length > 0) {
-        const avg = feedbacks.reduce((acc, f) => acc + f.rating, 0) / feedbacks.length
-        setSatisfaction(avg)
-      } else {
-        setSatisfaction(0)
+        const revenue = finance.reduce((acc, curr) => acc + curr.amount, 0)
+
+        setStats({
+          revenue,
+          lowStock: inventory.totalItems,
+          appointmentsCount: appointments.totalItems,
+          feedbacksCount: feedbacks.totalItems,
+        })
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
       }
+    }
 
-      const totalRevenue = finances
-        .filter((f) => f.status === 'paid')
-        .reduce((sum, f) => sum + f.amount, 0)
+    loadStats()
+  }, [user])
 
-      const pendingRevenue = finances
-        .filter((f) => f.status === 'pending')
-        .reduce((sum, f) => sum + f.amount, 0)
+  const toggleWidget = async (widgetId: string) => {
+    const isVisible = prefs.visibleWidgets.includes(widgetId)
+    const newWidgets = isVisible
+      ? prefs.visibleWidgets.filter((w) => w !== widgetId)
+      : [...prefs.visibleWidgets, widgetId]
 
-      const totalInsurancePending = finances
-        .filter((f) => f.billing_type === 'insurance' && f.status === 'transfer_pending')
-        .reduce((sum, f) => sum + f.amount, 0)
-      setInsurancePending(totalInsurancePending)
+    setPrefs({ visibleWidgets: newWidgets })
 
-      setKpis({
-        totalPatients: patients.length,
-        totalAppointments: appointments.length,
-        totalRevenue,
-        pendingRevenue,
+    try {
+      await pb.collection('users').update(user.id, {
+        settings: { ...(user.settings || {}), visibleWidgets: newWidgets },
       })
-
-      // Aggregate Professional Performance
-      const userMap = new Map(usersRes.map((u) => [u.id, u.name || u.email || 'Desconhecido']))
-      const perfMap: Record<string, { name: string; consultations: number; revenue: number }> = {}
-
-      // Count consultations
-      appointments.forEach((app) => {
-        const profId = app.professional_id
-        if (!profId) return
-        if (!perfMap[profId]) {
-          perfMap[profId] = {
-            name: userMap.get(profId) || 'Desconhecido',
-            consultations: 0,
-            revenue: 0,
-          }
-        }
-        perfMap[profId].consultations += 1
-      })
-
-      // Sum revenue
-      finances.forEach((f) => {
-        if (f.status !== 'paid') return
-        const profId = f.expand?.medical_note_id?.professionalId
-        if (profId) {
-          if (!perfMap[profId]) {
-            perfMap[profId] = {
-              name: userMap.get(profId) || 'Desconhecido',
-              consultations: 0,
-              revenue: 0,
-            }
-          }
-          perfMap[profId].revenue += f.amount
-        }
-      })
-
-      const chartData = Object.values(perfMap).sort((a, b) => b.consultations - a.consultations)
-      setPerformanceData(chartData)
-
-      // ABC Curve Logic
-      const materialCostMap = new Map<string, { name: string; totalValue: number }>()
-      usageRecords.forEach((u) => {
-        const batch = u.expand?.batch_id
-        const material = batch?.expand?.material_id
-        if (material && batch) {
-          const cost = u.quantity_used * (batch.cost_price || 0)
-          if (cost > 0) {
-            const existing = materialCostMap.get(material.id)
-            if (existing) {
-              existing.totalValue += cost
-            } else {
-              materialCostMap.set(material.id, { name: material.name, totalValue: cost })
-            }
-          }
-        }
-      })
-      const sortedMaterials = Array.from(materialCostMap.values()).sort(
-        (a, b) => b.totalValue - a.totalValue,
-      )
-      const totalOverallValue = sortedMaterials.reduce((sum, m) => sum + m.totalValue, 0)
-
-      let cumulative = 0
-      const abcItems = sortedMaterials.map((m) => {
-        cumulative += m.totalValue
-        const percentage = (cumulative / totalOverallValue) * 100
-        let category = 'C'
-        if (percentage <= 70) category = 'A'
-        else if (percentage <= 90) category = 'B'
-        return { ...m, category }
-      })
-
-      const abcSummary = [
-        {
-          name: 'Cat A (70%)',
-          value: abcItems
-            .filter((m) => m.category === 'A')
-            .reduce((sum, m) => sum + m.totalValue, 0),
-          fill: 'hsl(var(--destructive))',
-        },
-        {
-          name: 'Cat B (20%)',
-          value: abcItems
-            .filter((m) => m.category === 'B')
-            .reduce((sum, m) => sum + m.totalValue, 0),
-          fill: 'hsl(var(--warning))',
-        },
-        {
-          name: 'Cat C (10%)',
-          value: abcItems
-            .filter((m) => m.category === 'C')
-            .reduce((sum, m) => sum + m.totalValue, 0),
-          fill: 'hsl(var(--primary))',
-        },
-      ].filter((item) => item.value > 0)
-      setAbcData(abcSummary)
-
-      // Critical Stock
-      const critical = inventoryRes.filter((item) => item.current_quantity <= item.min_quantity)
-      setCriticalStock(critical)
     } catch (e) {
-      console.error('Error loading dashboard data', e)
-    } finally {
-      setLoading(false)
+      toast.error('Erro ao salvar preferências')
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  useRealtime('appointments', loadData)
-  useRealtime('consultations_finance', loadData)
-  useRealtime('patients', loadData)
-  useRealtime('medical_notes', loadData)
-  useRealtime('feedbacks', loadData)
-  useRealtime('inventory_counts', loadData)
+  const isVisible = (id: string) => prefs.visibleWidgets.includes(id)
 
   if (loading) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex justify-center p-10">
+        <Loader2 className="animate-spin text-primary h-8 w-8" />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral do desempenho e métricas da clínica.</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Pacientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.totalPatients}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Consultas</CardTitle>
-            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.totalAppointments}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Receita</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">R$ {kpis.totalRevenue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Pendente</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">R$ {kpis.pendingRevenue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">Satisfação</CardTitle>
-            <Star className="h-4 w-4 text-yellow-500 fill-current" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {satisfaction > 0 ? satisfaction.toFixed(1) : '-'}{' '}
-              <span className="text-sm font-normal text-muted-foreground">/ 5</span>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard Consolidado</h1>
+          <p className="text-muted-foreground">
+            Visão geral das suas operações baseada nas suas preferências.
+          </p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline">
+              <Settings2 className="mr-2 h-4 w-4" />
+              Configurar Dashboard
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 space-y-4">
+            <h4 className="font-medium leading-none">Widgets Visíveis</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Faturamento</span>
+                <Switch
+                  checked={isVisible('finance')}
+                  onCheckedChange={() => toggleWidget('finance')}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Alertas de Estoque</span>
+                <Switch
+                  checked={isVisible('inventory')}
+                  onCheckedChange={() => toggleWidget('inventory')}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Volume de Consultas</span>
+                <Switch
+                  checked={isVisible('appointments')}
+                  onCheckedChange={() => toggleWidget('appointments')}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Feedbacks</span>
+                <Switch
+                  checked={isVisible('feedbacks')}
+                  onCheckedChange={() => toggleWidget('feedbacks')}
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">A Receber (Convênio)</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-blue-600">R$ {insurancePending.toFixed(2)}</div>
-          </CardContent>
-        </Card>
+          </PopoverContent>
+        </Popover>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* ABC Curve */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Curva ABC - Consumo de Estoque</CardTitle>
-            <CardDescription>
-              Classificação financeira dos materiais (A: 70%, B: 20%, C: 10%).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {abcData.length > 0 ? (
-              <ChartContainer config={{}} className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={abcData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {abcData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                Sem dados de consumo para análise ABC
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {prefs.visibleWidgets.length === 0 ? (
+        <div className="flex flex-col h-40 items-center justify-center border rounded-lg bg-muted/10 border-dashed">
+          <Settings2 className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
+          <p className="text-muted-foreground text-sm">Nenhum widget selecionado.</p>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'grid gap-4',
+            prefs.visibleWidgets.length === 1
+              ? 'md:grid-cols-1'
+              : prefs.visibleWidgets.length === 2
+                ? 'md:grid-cols-2'
+                : prefs.visibleWidgets.length === 3
+                  ? 'md:grid-cols-3'
+                  : 'md:grid-cols-4',
+          )}
+        >
+          {isVisible('finance') && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita Total Paga</CardTitle>
+                <DollarSign className="h-4 w-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-emerald-600">
+                  R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-muted-foreground">Faturamento consolidado</p>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Inventory Counts / Discrepancies */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Auditoria de Estoque (Físico x Sistema)</CardTitle>
-            <CardDescription>Últimas contagens e divergências encontradas.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentCounts.length > 0 ? (
-              <div className="space-y-4 mt-4">
-                {recentCounts.map((count) => {
-                  const isLoss = count.discrepancy < 0
-                  return (
-                    <div
-                      key={count.id}
-                      className="flex items-center justify-between border-b pb-2 last:border-0"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">
-                          {count.expand?.material_id?.name || 'Material'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(count.created).toLocaleDateString()} por{' '}
-                          {count.expand?.professional_id?.name?.split(' ')[0] || 'Staff'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-sm font-bold">Físico: {count.actual_quantity}</span>
-                        {count.discrepancy !== 0 ? (
-                          <span
-                            className={cn(
-                              'text-xs font-semibold',
-                              isLoss ? 'text-destructive' : 'text-green-600',
-                            )}
-                          >
-                            {isLoss ? 'Perda:' : 'Sobra:'}{' '}
-                            {count.discrepancy > 0 ? `+${count.discrepancy}` : count.discrepancy}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sincronizado</span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                Nenhuma contagem registrada.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {isVisible('inventory') && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Alertas de Estoque</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-destructive">{stats.lowStock}</div>
+                <p className="text-xs text-muted-foreground">Itens abaixo do mínimo</p>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Critical Stock */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-destructive flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Estoque Crítico
-              </CardTitle>
-              <CardDescription>Materiais abaixo da quantidade mínima</CardDescription>
-            </div>
-            <Link to="/inventory/orders">
-              <ShoppingCart className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {criticalStock.length > 0 ? (
-              <div className="space-y-4 mt-4">
-                {criticalStock.slice(0, 5).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between border-b pb-2 last:border-0"
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Mínimo: {item.min_quantity} {item.unit}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-destructive font-bold text-sm">
-                        {item.current_quantity} {item.unit}
-                      </span>
-                      <Link
-                        to="/inventory/orders"
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        Ver Pedidos
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-                {criticalStock.length > 5 && (
-                  <p className="text-xs text-center text-muted-foreground pt-2">
-                    + {criticalStock.length - 5} outros itens críticos
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                Nenhum item em estado crítico
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {isVisible('appointments') && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Agendamentos Ativos</CardTitle>
+                <Calendar className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.appointmentsCount}</div>
+                <p className="text-xs text-muted-foreground">Consultas marcadas</p>
+              </CardContent>
+            </Card>
+          )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Volume de Consultas por Profissional</CardTitle>
-            <CardDescription>
-              Número total de atendimentos agendados por membro da equipe.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {performanceData.length > 0 ? (
-              <ChartContainer
-                config={{ consultations: { label: 'Consultas', color: 'hsl(var(--primary))' } }}
-                className="h-[300px] w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={performanceData}
-                    margin={{ top: 20, right: 0, left: 0, bottom: 20 }}
-                  >
-                    <XAxis
-                      dataKey="name"
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      allowDecimals={false}
-                    />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="consultations"
-                      fill="var(--color-consultations)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                Sem dados suficientes
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Receita por Profissional</CardTitle>
-            <CardDescription>
-              Valor gerado vinculado aos prontuários e pagamentos confirmados.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {performanceData.some((d) => d.revenue > 0) ? (
-              <ChartContainer
-                config={{ revenue: { label: 'Receita (R$)', color: 'hsl(var(--chart-2))' } }}
-                className="h-[300px] w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={performanceData}
-                    margin={{ top: 20, right: 0, left: 0, bottom: 20 }}
-                  >
-                    <XAxis
-                      dataKey="name"
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `R$${value}`}
-                    />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground text-center px-4">
-                Receita por profissional requer faturamentos pagos e vinculados a prontuários
-                médicos.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {isVisible('feedbacks') && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avaliações</CardTitle>
+                <MessageSquare className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.feedbacksCount}</div>
+                <p className="text-xs text-muted-foreground">Feedbacks recebidos</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }

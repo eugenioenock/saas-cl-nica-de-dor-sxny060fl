@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T16:54:47.083Z",
+  "generatedAt": "2026-04-19T17:00:46.746Z",
   "collections": [
     {
       "name": "users",
@@ -58,6 +58,12 @@
           "required": false,
           "system": false,
           "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -154,7 +160,7 @@
           "collectionRef": "clinic_settings"
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE INDEX `idx_patients_clinic_id` ON `patients` (clinic_id)"]
     },
     {
       "name": "pain_points",
@@ -317,7 +323,10 @@
           "collectionRef": "clinic_settings"
         }
       ],
-      "indexes": ["CREATE INDEX `idx_medical_notes_is_signed` ON `medical_notes` (is_signed)"]
+      "indexes": [
+        "CREATE INDEX `idx_medical_notes_is_signed` ON `medical_notes` (is_signed)",
+        "CREATE INDEX `idx_medical_notes_clinic_id` ON `medical_notes` (clinic_id)"
+      ]
     },
     {
       "name": "pathologies_catalog",
@@ -510,7 +519,7 @@
           "collectionRef": "clinic_settings"
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE INDEX `idx_finance_clinic_id` ON `consultations_finance` (clinic_id)"]
     },
     {
       "name": "appointments",
@@ -596,7 +605,10 @@
           "collectionRef": "clinic_settings"
         }
       ],
-      "indexes": ["CREATE INDEX idx_appointments_start ON appointments (start_time)"]
+      "indexes": [
+        "CREATE INDEX idx_appointments_start ON appointments (start_time)",
+        "CREATE INDEX `idx_appointments_clinic_id` ON `appointments` (clinic_id)"
+      ]
     },
     {
       "name": "clinical_inventory",

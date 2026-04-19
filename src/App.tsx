@@ -23,6 +23,7 @@ import ReportsPerformance from './pages/ReportsPerformance'
 import Integrations from './pages/Integrations'
 import SettingsAccessControl from './pages/SettingsAccessControl'
 import SettingsMaintenance from './pages/SettingsMaintenance'
+import SettingsMaintenanceMigration from './pages/SettingsMaintenanceMigration'
 import MatrixDashboard from './pages/MatrixDashboard'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
@@ -75,6 +76,10 @@ const App = () => (
               <Route path="/settings/integrations" element={<Integrations />} />
               <Route path="/settings/access-control" element={<SettingsAccessControl />} />
               <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
+              <Route
+                path="/settings/maintenance/migration"
+                element={<SettingsMaintenanceMigration />}
+              />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
