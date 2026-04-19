@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Zap,
   Plug,
+  Building2,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const adminNavItems = [
   { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
   { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },
+  { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
 ]
 
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
@@ -46,6 +48,7 @@ const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/po
 const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
   { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
+  { title: 'Auditoria', icon: Activity, url: '/settings/audit-history', adminOnly: true },
 ]
 
 export function AppSidebar() {

@@ -170,11 +170,19 @@ export function IntegrationEditor({ integration, open, onOpenChange, onSave }: a
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="email_provider">Email Provider (SMTP)</SelectItem>
-                <SelectItem value="webhook">Webhook Customizado</SelectItem>
+                <SelectItem value="webhook">
+                  Webhook Customizado (Ex: Access Request Alerts)
+                </SelectItem>
                 <SelectItem value="barcode_service">Serviço de Código de Barras</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {formData.type === 'webhook' && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Dica: Para alertas de solicitação de acesso, ative esta integração. Um payload de
+              "access_request" será enviado sempre que um novo usuário se registrar.
+            </p>
+          )}
           <div className="pt-2 border-t space-y-5">{renderConfigFields()}</div>
           <PlaceholderInfo />
         </div>

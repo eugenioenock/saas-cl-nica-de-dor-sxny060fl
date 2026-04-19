@@ -27,6 +27,8 @@ import SettingsMaintenance from './pages/SettingsMaintenance'
 import SettingsMaintenanceMigration from './pages/SettingsMaintenanceMigration'
 import MatrixDashboard from './pages/MatrixDashboard'
 import PendingApproval from './pages/PendingApproval'
+import UnitsComparison from './pages/UnitsComparison'
+import AuditHistory from './pages/AuditHistory'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -64,6 +66,7 @@ const App = () => (
               <Route path="/" element={<RouteDispatcher />} />
               <Route path="/dashboard" element={<Index />} />
               <Route path="/dashboard/matrix" element={<MatrixDashboard />} />
+              <Route path="/dashboard/units-comparison" element={<UnitsComparison />} />
               <Route path="/portal" element={<Portal />} />
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
@@ -78,6 +81,7 @@ const App = () => (
               <Route path="/reports/performance" element={<ReportsPerformance />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/integrations" element={<Integrations />} />
+              <Route path="/settings/audit-history" element={<AuditHistory />} />
               <Route path="/settings/access-control" element={<SettingsAccessControl />} />
               <Route path="/settings/reports" element={<SettingsReports />} />
               <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
