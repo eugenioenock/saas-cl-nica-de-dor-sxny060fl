@@ -63,10 +63,11 @@ import {
 import { cn } from '@/lib/utils'
 import { Package } from 'lucide-react'
 import React from 'react'
+import backViewImg from '@/assets/corpo-humano-a22bb.jpg'
 
 const ANATOMY_REGIONS = [
   { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14, w: 14, h: 10 },
-  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
+  { id: 'toracica', name: 'Coluna Toráxica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
   { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 46, w: 18, h: 12 },
 
   { id: 'ombro_dir_f', name: 'Ombro Direito', view: 'front', x: 28, y: 20, w: 15, h: 12 },
@@ -398,12 +399,28 @@ export default function PatientRecord() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 bg-gradient-to-b from-muted/10 to-muted/30">
-                <div className="relative aspect-[1/2] max-w-sm mx-auto bg-slate-950 border border-border/50 rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] transition-all duration-300">
-                  <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+                <div
+                  className={cn(
+                    'relative aspect-[1/2] max-w-sm mx-auto border border-border/50 rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] transition-all duration-300',
+                    view === 'front' ? 'bg-slate-950' : 'bg-slate-100 dark:bg-slate-200',
+                  )}
+                >
+                  {view === 'front' && (
+                    <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+                  )}
                   <img
-                    src={`https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20${view}&color=cyan`}
+                    src={
+                      view === 'front'
+                        ? `https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20front&color=cyan`
+                        : backViewImg
+                    }
                     alt={`Body ${view}`}
-                    className="w-full h-full object-cover mix-blend-screen pointer-events-none opacity-80 transition-opacity duration-500"
+                    className={cn(
+                      'w-full h-full object-cover pointer-events-none transition-opacity duration-500',
+                      view === 'front'
+                        ? 'mix-blend-screen opacity-80'
+                        : 'opacity-100 mix-blend-multiply',
+                    )}
                   />
 
                   {ANATOMY_REGIONS.filter((r) => r.view === view).map((region) => {
@@ -415,8 +432,12 @@ export default function PatientRecord() {
                         className={cn(
                           'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
                           isActive
-                            ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
-                            : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
+                            ? view === 'front'
+                              ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
+                              : 'bg-red-600/60 shadow-[0_0_30px_15px_rgba(220,38,38,0.6)] z-20 border border-red-600/50 mix-blend-multiply animate-pulse'
+                            : view === 'front'
+                              ? 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30'
+                              : 'hover:bg-red-500/20 hover:shadow-[0_0_15px_5px_rgba(239,68,68,0.2)] z-10 border border-transparent hover:border-red-500/30',
                         )}
                         style={{
                           left: `${region.x}%`,

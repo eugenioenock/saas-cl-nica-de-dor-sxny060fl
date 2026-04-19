@@ -20,12 +20,13 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
+import backViewImg from '@/assets/corpo-humano-a22bb.jpg'
 
 type MapView = 'front' | 'back'
 
 const ANATOMY_REGIONS = [
   { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14, w: 14, h: 10 },
-  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
+  { id: 'toracica', name: 'Coluna Toráxica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
   { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 46, w: 18, h: 12 },
 
   { id: 'ombro_dir_f', name: 'Ombro Direito', view: 'front', x: 28, y: 20, w: 15, h: 12 },
@@ -218,13 +219,27 @@ export function BodyMap({ patientId }: { patientId: string }) {
           </Tabs>
         </div>
 
-        <div className="flex-1 relative flex items-center justify-center p-4 bg-slate-950 overflow-hidden">
-          <div className="relative w-full max-w-[220px] aspect-[1/2]">
-            <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+        <div
+          className={cn(
+            'flex-1 relative flex items-center justify-center p-4 overflow-hidden transition-colors duration-300',
+            view === 'front' ? 'bg-slate-950' : 'bg-slate-100 dark:bg-slate-200',
+          )}
+        >
+          <div className="relative w-full max-w-[220px] aspect-[1/2] rounded-lg overflow-hidden">
+            {view === 'front' && (
+              <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+            )}
             <img
-              src={`https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20${view}&color=cyan`}
+              src={
+                view === 'front'
+                  ? `https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20front&color=cyan`
+                  : backViewImg
+              }
               alt={`Body ${view}`}
-              className="w-full h-full object-cover mix-blend-screen pointer-events-none opacity-80"
+              className={cn(
+                'w-full h-full object-cover pointer-events-none transition-opacity duration-500',
+                view === 'front' ? 'mix-blend-screen opacity-80' : 'opacity-100 mix-blend-multiply',
+              )}
             />
 
             {ANATOMY_REGIONS.filter((h) => h.view === view).map((region) => {
@@ -238,8 +253,12 @@ export function BodyMap({ patientId }: { patientId: string }) {
                   className={cn(
                     'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
                     isActive
-                      ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
-                      : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
+                      ? view === 'front'
+                        ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
+                        : 'bg-red-600/60 shadow-[0_0_30px_15px_rgba(220,38,38,0.6)] z-20 border border-red-600/50 mix-blend-multiply animate-pulse'
+                      : view === 'front'
+                        ? 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30'
+                        : 'hover:bg-red-500/20 hover:shadow-[0_0_15px_5px_rgba(239,68,68,0.2)] z-10 border border-transparent hover:border-red-500/30',
                     isHovered && isActive && 'ring-2 ring-white/50 scale-110',
                   )}
                   style={{
