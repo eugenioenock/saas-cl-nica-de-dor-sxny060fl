@@ -152,20 +152,29 @@ export default function SettingsAccessControl() {
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => {
-            const headers = ['Nome', 'Email', 'Função', 'Acessos']
-            const rows = filteredUsers.map(u => {
-              const uAccesses = u.role === 'admin' ? 'Todas' : accessRecords.filter(a => a.user_id === u.id).map(a => a.expand?.clinic_id?.name || 'Unidade').join('; ')
-              return `"${u.name || ''}","${u.email}","${u.role}","${uAccesses}"`
-            })
-            const csv = [headers.join(','), ...rows].join('\n')
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = 'auditoria_acessos.csv'
-            a.click()
-          }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const headers = ['Nome', 'Email', 'Função', 'Acessos']
+              const rows = filteredUsers.map((u) => {
+                const uAccesses =
+                  u.role === 'admin'
+                    ? 'Todas'
+                    : accessRecords
+                        .filter((a) => a.user_id === u.id)
+                        .map((a) => a.expand?.clinic_id?.name || 'Unidade')
+                        .join('; ')
+                return `"${u.name || ''}","${u.email}","${u.role}","${uAccesses}"`
+              })
+              const csv = [headers.join(','), ...rows].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = 'auditoria_acessos.csv'
+              a.click()
+            }}
+          >
             <Download className="mr-2 h-4 w-4" /> CSV
           </Button>
           <Button variant="outline" onClick={() => window.print()}>
@@ -173,18 +182,19 @@ export default function SettingsAccessControl() {
           </Button>
           <div className="w-full sm:w-64 ml-2">
             <Select value={filterClinic} onValueChange={setFilterClinic}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por Clínica" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Clínicas</SelectItem>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por Clínica" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Clínicas</SelectItem>
+                {clinics.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -309,15 +319,19 @@ export default function SettingsAccessControl() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map(u => {
-              const uAccesses = accessRecords.filter(a => a.user_id === u.id)
+            {filteredUsers.map((u) => {
+              const uAccesses = accessRecords.filter((a) => a.user_id === u.id)
               return (
                 <tr key={u.id} className="border-b border-gray-300">
                   <td className="py-2">{u.name || 'Sem nome'}</td>
                   <td className="py-2">{u.email}</td>
                   <td className="py-2 capitalize">{u.role}</td>
                   <td className="py-2">
-                    {u.role === 'admin' ? 'Todas as Unidades' : (uAccesses.length > 0 ? uAccesses.map(a => a.expand?.clinic_id?.name).join(', ') : 'Nenhum')}
+                    {u.role === 'admin'
+                      ? 'Todas as Unidades'
+                      : uAccesses.length > 0
+                        ? uAccesses.map((a) => a.expand?.clinic_id?.name).join(', ')
+                        : 'Nenhum'}
                   </td>
                 </tr>
               )
