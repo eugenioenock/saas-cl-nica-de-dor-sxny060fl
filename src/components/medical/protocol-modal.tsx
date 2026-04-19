@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FileSignature, Loader2, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { FileSignature, Loader2, AlertTriangle, PenTool } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
@@ -41,6 +41,9 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
   const [loading, setLoading] = useState(false)
   const [stockWarning, setStockWarning] = useState<string | null>(null)
 
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+
   useEffect(() => {
     if (open) {
       loadTemplates()
@@ -51,6 +54,31 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
       setStockWarning(null)
     }
   }, [open])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (canvas && selectedTemplate) {
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = 2
+      }
+
+      const preventDefault = (e: Event) => e.preventDefault()
+      canvas.addEventListener('touchstart', preventDefault, { passive: false })
+      canvas.addEventListener('touchmove', preventDefault, { passive: false })
+
+      return () => {
+        canvas.removeEventListener('touchstart', preventDefault)
+        canvas.removeEventListener('touchmove', preventDefault)
+      }
+    }
+  }, [selectedTemplate])
 
   const loadTemplates = async () => {
     try {
@@ -76,25 +104,136 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
     setStockWarning(null)
   }
 
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDrawing(true)
+    draw(e)
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d')
+      ctx?.beginPath()
+    }
+  }
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    let clientX, clientY
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      clientX = (e as React.MouseEvent).clientX
+      clientY = (e as React.MouseEvent).clientY
+    }
+
+    const x = clientX - rect.left
+    const y = clientY - rect.top
+
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+
+  const clearSignature = () => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.beginPath()
+      }
+    }
+  }
+
+  const isCanvasEmpty = (canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return true
+    const blank = document.createElement('canvas')
+    blank.width = canvas.width
+    blank.height = canvas.height
+    const ctx = blank.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, blank.width, blank.height)
+    }
+    return canvas.toDataURL() === blank.toDataURL()
+  }
+
+  const generateHash = (str: string) => {
+    let hash = 0
+    for (let i = 0, len = str.length; i < len; i++) {
+      let chr = str.charCodeAt(i)
+      hash = (hash << 5) - hash + chr
+      hash |= 0
+    }
+    return Math.abs(hash).toString(16)
+  }
+
   const handleSubmit = async (ignoreStock = false) => {
     if (!selectedTemplate) return
+
+    const dataUrl = canvasRef.current?.toDataURL('image/png')
+    if (!dataUrl || isCanvasEmpty(canvasRef.current)) {
+      toast.error('A assinatura digital do paciente é obrigatória para este procedimento.')
+      return
+    }
+
     setLoading(true)
     setStockWarning(null)
 
     try {
+      const finalNote = noteContent + `\n\n---\nProtocolo: ${selectedTemplate.name}`
       await pb.send('/backend/v1/protocols/apply', {
         method: 'POST',
         body: JSON.stringify({
           patient_id: patientId,
           template_id: selectedTemplate.id,
-          note_content: noteContent,
+          note_content: finalNote,
           amount: Number(amount),
           billing_type: billingType,
           ignore_stock: ignoreStock,
         }),
       })
 
-      toast.success('Protocolo clínico aplicado com sucesso!')
+      const hash = generateHash(dataUrl)
+
+      try {
+        const recentNotes = await pb.collection('medical_notes').getList(1, 1, {
+          filter: `patient_id="${patientId}" && created >= "${new Date(Date.now() - 60000).toISOString()}"`,
+          sort: '-created',
+        })
+        if (recentNotes.items.length > 0) {
+          await pb.collection('medical_notes').update(recentNotes.items[0].id, {
+            is_signed: true,
+            signed_at: new Date().toISOString(),
+            signature_hash: hash,
+          })
+        }
+
+        const recentUsages = await pb.collection('inventory_usage').getFullList({
+          filter: `patient_id="${patientId}" && created >= "${new Date(Date.now() - 60000).toISOString()}"`,
+        })
+        for (const usage of recentUsages) {
+          await pb.collection('inventory_usage').update(usage.id, {
+            is_verified: true,
+            verified_at: new Date().toISOString(),
+            signature_hash: hash,
+          })
+        }
+      } catch (err) {
+        console.warn('Could not save signature hash directly', err)
+      }
+
+      toast.success('Protocolo clínico aplicado e assinado com sucesso!')
       setOpen(false)
       onSuccess()
     } catch (err: any) {
@@ -122,7 +261,7 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
           <DialogTitle>Aplicar Protocolo Clínico</DialogTitle>
           <DialogDescription>
             Selecione um protocolo para preencher automaticamente o prontuário, deduzir materiais do
-            estoque e gerar a cobrança respectiva.
+            estoque e coletar o consentimento do paciente.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,7 +289,7 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
                 <Textarea
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
-                  className="min-h-[150px]"
+                  className="min-h-[120px]"
                 />
               </div>
 
@@ -176,6 +315,38 @@ export function ProtocolModal({ patientId, onSuccess }: ProtocolModalProps) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2 border rounded-md p-3 bg-slate-50">
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="flex items-center gap-2 text-slate-800 font-semibold">
+                    <PenTool className="h-4 w-4" />
+                    Assinatura do Paciente (Termo de Consentimento)
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearSignature}
+                    className="h-7 px-3 text-xs bg-white"
+                  >
+                    Limpar
+                  </Button>
+                </div>
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-32 border border-slate-300 rounded bg-white cursor-crosshair touch-none shadow-inner"
+                />
+                <p className="text-[11px] text-slate-500 mt-1 text-center">
+                  O paciente deve assinar no quadro acima para registrar o consentimento.
+                </p>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-md text-sm text-slate-600">

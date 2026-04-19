@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Printer, Loader2, BarChart3, Activity } from 'lucide-react'
+import { Printer, Loader2, BarChart3, Activity, Search, TrendingUp, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,25 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Link } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart'
+
+const chartConfig = {
+  plannedCost: {
+    label: 'Custo Estimado (R$)',
+    color: 'hsl(var(--primary))',
+  },
+  actualCost: {
+    label: 'Custo Real (R$)',
+    color: 'hsl(var(--destructive))',
+  },
+}
 
 export default function Reports() {
   const [stats, setStats] = useState<any[]>([])
@@ -27,6 +45,9 @@ export default function Reports() {
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [isSearchingBatch, setIsSearchingBatch] = useState(false)
   const [activeTab, setActiveTab] = useState('epidemiology')
+
+  const [efficiencyChartData, setEfficiencyChartData] = useState<any[]>([])
+  const [wasteReport, setWasteReport] = useState<any[]>([])
 
   const loadData = async () => {
     try {
@@ -68,6 +89,123 @@ export default function Reports() {
         .sort((a, b) => b.count - a.count)
 
       setStats(statsArray)
+
+      // Load Efficiency Data
+      const templates = await pb.collection('clinic_templates').getFullList({
+        filter: "type='consultation_pattern'",
+      })
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+      const [notes, usages] = await Promise.all([
+        pb.collection('medical_notes').getFullList({
+          filter: `created >= "${thirtyDaysAgo}"`,
+          expand: 'patient_id',
+        }),
+        pb.collection('inventory_usage').getFullList({
+          filter: `created >= "${thirtyDaysAgo}"`,
+          expand: 'batch_id,batch_id.material_id',
+        }),
+      ])
+
+      const effData: any[] = []
+      const wasteData: any[] = []
+
+      notes.forEach((note) => {
+        const match = note.content.match(/Protocolo:\s*(.+)$/m)
+        if (match) {
+          const templateName = match[1].trim()
+          const template = templates.find((t) => t.name === templateName)
+
+          const procedureUsages = usages.filter(
+            (u) =>
+              u.medical_note_id === note.id ||
+              (u.patient_id === note.patient_id &&
+                Math.abs(new Date(u.created).getTime() - new Date(note.created).getTime()) < 60000),
+          )
+
+          if (template && procedureUsages.length > 0) {
+            let actualCost = 0
+            let plannedCost = 0
+            let isWaste = false
+            const wasteDetails: any[] = []
+
+            const plannedMaterials = template.config_data?.required_materials || []
+
+            procedureUsages.forEach((u) => {
+              const batch = u.expand?.batch_id
+              const qty = u.quantity_used
+              const price = batch?.cost_price || 0
+              actualCost += qty * price
+
+              const materialId = batch?.material_id
+              const planned = plannedMaterials.find((pm: any) => pm.material_id === materialId)
+              const plannedQty = planned ? planned.quantity : 0
+
+              if (qty > plannedQty * 1.1) {
+                isWaste = true
+                wasteDetails.push({
+                  material: batch?.expand?.material_id?.name,
+                  plannedQty,
+                  actualQty: qty,
+                  wasteCost: (qty - plannedQty) * price,
+                })
+              }
+            })
+
+            plannedMaterials.forEach((pm: any) => {
+              const usageFound = procedureUsages.find(
+                (u) => u.expand?.batch_id?.material_id === pm.material_id,
+              )
+              const price = usageFound ? usageFound.expand?.batch_id?.cost_price || 0 : 0
+              plannedCost += pm.quantity * price
+            })
+
+            effData.push({
+              templateName,
+              actualCost,
+              plannedCost,
+            })
+
+            if (isWaste) {
+              wasteData.push({
+                noteId: note.id,
+                date: note.created,
+                patient: note.expand?.patient_id?.name,
+                templateName,
+                details: wasteDetails,
+              })
+            }
+          }
+        }
+      })
+
+      const groupedEff = Object.values(
+        effData.reduce(
+          (acc, curr) => {
+            if (!acc[curr.templateName]) {
+              acc[curr.templateName] = {
+                name: curr.templateName,
+                plannedCost: 0,
+                actualCost: 0,
+                count: 0,
+              }
+            }
+            acc[curr.templateName].plannedCost += curr.plannedCost
+            acc[curr.templateName].actualCost += curr.actualCost
+            acc[curr.templateName].count += 1
+            return acc
+          },
+          {} as Record<string, any>,
+        ),
+      ).map((g: any) => ({
+        name: g.name,
+        plannedCost: Number((g.plannedCost / g.count).toFixed(2)),
+        actualCost: Number((g.actualCost / g.count).toFixed(2)),
+      }))
+
+      setEfficiencyChartData(groupedEff)
+      setWasteReport(wasteData)
     } catch (e) {
       console.error(e)
     } finally {
@@ -80,6 +218,7 @@ export default function Reports() {
   }, [])
 
   useRealtime('pain_points', loadData)
+  useRealtime('inventory_usage', loadData)
 
   const searchBatch = async () => {
     if (!batchSearch.trim()) return
@@ -113,7 +252,7 @@ export default function Reports() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Relatórios & Auditoria</h1>
             <p className="text-muted-foreground">
-              Visão geral epidemiológica e ferramentas de rastreabilidade.
+              Visão geral epidemiológica, eficiência de protocolos e auditoria de lotes.
             </p>
           </div>
           <Button
@@ -139,6 +278,7 @@ export default function Reports() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="epidemiology">Epidemiológico</TabsTrigger>
+            <TabsTrigger value="efficiency">Eficiência de Protocolos</TabsTrigger>
             <TabsTrigger value="audit">Auditoria de Lotes</TabsTrigger>
           </TabsList>
 
@@ -184,6 +324,111 @@ export default function Reports() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="efficiency">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Comparativo de Custos por Protocolo
+                  </CardTitle>
+                  <CardDescription>
+                    Custo Estimado vs Custo Real médio dos últimos 30 dias.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {efficiencyChartData.length > 0 ? (
+                    <div className="h-[350px] w-full">
+                      <ChartContainer config={chartConfig} className="h-full w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={efficiencyChartData}
+                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                            <YAxis
+                              tickFormatter={(val) => `R$ ${val}`}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            <Bar
+                              dataKey="plannedCost"
+                              fill="var(--color-plannedCost)"
+                              radius={[4, 4, 0, 0]}
+                            />
+                            <Bar
+                              dataKey="actualCost"
+                              fill="var(--color-actualCost)"
+                              radius={[4, 4, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-muted-foreground flex flex-col items-center">
+                      <Receipt className="h-10 w-10 mb-4 opacity-20" />
+                      <p>Nenhum dado de protocolo disponível para os últimos 30 dias.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-destructive">Relatório de Desperdício</CardTitle>
+                  <CardDescription>
+                    Procedimentos onde a quantidade real utilizada excedeu em mais de 10% a
+                    quantidade planejada.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {wasteReport.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Paciente</TableHead>
+                          <TableHead>Protocolo</TableHead>
+                          <TableHead>Material</TableHead>
+                          <TableHead className="text-right">Previsto</TableHead>
+                          <TableHead className="text-right">Utilizado</TableHead>
+                          <TableHead className="text-right">Custo Extra</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {wasteReport.flatMap((report, i) =>
+                          report.details.map((detail: any, j: number) => (
+                            <TableRow key={`${i}-${j}`}>
+                              <TableCell>{new Date(report.date).toLocaleDateString()}</TableCell>
+                              <TableCell className="font-medium">{report.patient}</TableCell>
+                              <TableCell>{report.templateName}</TableCell>
+                              <TableCell>{detail.material}</TableCell>
+                              <TableCell className="text-right">{detail.plannedQty}</TableCell>
+                              <TableCell className="text-right text-destructive font-bold">
+                                {detail.actualQty}
+                              </TableCell>
+                              <TableCell className="text-right text-destructive font-medium">
+                                R$ {detail.wasteCost.toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          )),
+                        )}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      Nenhum desperdício significativo detectado.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="audit">
@@ -304,7 +549,11 @@ export default function Reports() {
           </div>
           <div className="text-right text-gray-600 flex flex-col justify-end">
             <span className="font-semibold text-black uppercase mb-1">
-              {activeTab === 'epidemiology' ? 'Relatório Epidemiológico' : 'Auditoria de Lotes'}
+              {activeTab === 'epidemiology'
+                ? 'Relatório Epidemiológico'
+                : activeTab === 'efficiency'
+                  ? 'Eficiência de Protocolos'
+                  : 'Auditoria de Lotes'}
             </span>
             <span>Gerado em: {new Date().toLocaleDateString()}</span>
           </div>
@@ -335,6 +584,45 @@ export default function Reports() {
                   <tr>
                     <td colSpan={3} className="p-4 text-center text-gray-500">
                       Nenhum dado disponível.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : activeTab === 'efficiency' ? (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-4 uppercase bg-gray-100 p-2 rounded">
+              Desperdício Detectado
+            </h2>
+            <table className="w-full border-collapse mt-2">
+              <thead>
+                <tr className="border-b-2 border-gray-300 text-left">
+                  <th className="p-2 font-bold">Data</th>
+                  <th className="p-2 font-bold">Paciente</th>
+                  <th className="p-2 font-bold">Protocolo</th>
+                  <th className="p-2 font-bold">Material</th>
+                  <th className="p-2 font-bold text-right">Previsto</th>
+                  <th className="p-2 font-bold text-right">Utilizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wasteReport.flatMap((report, i) =>
+                  report.details.map((detail: any, j: number) => (
+                    <tr key={`${i}-${j}`} className="border-b border-gray-200">
+                      <td className="p-2">{new Date(report.date).toLocaleDateString()}</td>
+                      <td className="p-2">{report.patient}</td>
+                      <td className="p-2">{report.templateName}</td>
+                      <td className="p-2">{detail.material}</td>
+                      <td className="p-2 text-right">{detail.plannedQty}</td>
+                      <td className="p-2 text-right font-bold text-red-600">{detail.actualQty}</td>
+                    </tr>
+                  )),
+                )}
+                {wasteReport.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-4 text-center text-gray-500">
+                      Nenhum desperdício detectado.
                     </td>
                   </tr>
                 )}
