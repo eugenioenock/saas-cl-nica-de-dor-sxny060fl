@@ -14,6 +14,8 @@ import {
   Zap,
   Plug,
   Building2,
+  FileText,
+  ArrowRightLeft,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -47,7 +49,25 @@ const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/po
 
 const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
-  { title: 'Franquia', icon: Building2, url: '/admin/franchise', adminOnly: true },
+  { title: 'Franquia - Unidades', icon: Building2, url: '/admin/franchise', adminOnly: true },
+  {
+    title: 'Franquia - Dashboard',
+    icon: BarChart3,
+    url: '/admin/franchise/dashboard',
+    adminOnly: true,
+  },
+  {
+    title: 'Franquia - Templates',
+    icon: FileText,
+    url: '/admin/franchise/templates',
+    adminOnly: true,
+  },
+  {
+    title: 'Franquia - Transf.',
+    icon: ArrowRightLeft,
+    url: '/admin/franchise/transfers',
+    adminOnly: true,
+  },
   { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
   { title: 'Auditoria', icon: Activity, url: '/settings/audit-history', adminOnly: true },
 ]

@@ -43,6 +43,8 @@ export default function FranchiseManagement() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingClinic, setEditingClinic] = useState<Clinic | null>(null)
+  const [templates, setTemplates] = useState<any[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('none')
 
   const [formData, setFormData] = useState({
     name: '',
@@ -68,6 +70,10 @@ export default function FranchiseManagement() {
 
   useEffect(() => {
     loadClinics()
+    pb.collection('clinic_templates')
+      .getFullList()
+      .then(setTemplates)
+      .catch(() => {})
   }, [])
 
   useRealtime('clinic_settings', loadClinics)
@@ -76,6 +82,7 @@ export default function FranchiseManagement() {
 
   const handleOpenDialog = (clinic?: Clinic) => {
     setErrors({})
+    setSelectedTemplate('none')
     if (clinic) {
       setEditingClinic(clinic)
       setFormData({
@@ -104,11 +111,19 @@ export default function FranchiseManagement() {
     setSaving(true)
     setErrors({})
     try {
+      let finalData = { ...formData }
+      if (!editingClinic && selectedTemplate !== 'none') {
+        const tpl = templates.find((t) => t.id === selectedTemplate)
+        if (tpl && tpl.config_data) {
+          finalData = { ...finalData, ...tpl.config_data }
+        }
+      }
+
       if (editingClinic) {
-        await pb.collection('clinic_settings').update(editingClinic.id, formData)
+        await pb.collection('clinic_settings').update(editingClinic.id, finalData)
         toast.success('Unidade atualizada com sucesso!')
       } else {
-        await pb.collection('clinic_settings').create(formData)
+        await pb.collection('clinic_settings').create(finalData)
         toast.success('Unidade criada com sucesso!')
       }
       setDialogOpen(false)
@@ -232,6 +247,24 @@ export default function FranchiseManagement() {
               />
               {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
             </div>
+            {!editingClinic && (
+              <div className="grid gap-2">
+                <Label htmlFor="template">Aplicar Template de Configuração (Opcional)</Label>
+                <select
+                  id="template"
+                  className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                >
+                  <option value="none">Nenhum template</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="address">Endereço</Label>
               <Input

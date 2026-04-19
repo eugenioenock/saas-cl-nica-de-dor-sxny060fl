@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:23:04.197Z",
+  "generatedAt": "2026-04-19T17:30:50.906Z",
   "collections": [
     {
       "name": "users",
@@ -443,8 +443,8 @@
       "name": "consultations_finance",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
-        "view": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "delete": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id"
@@ -532,8 +532,8 @@
       "name": "appointments",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
-        "view": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
         "delete": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id"
@@ -1387,6 +1387,135 @@
       "indexes": [
         "CREATE INDEX `idx_action_logs_created_clinic` ON `action_logs` (created, clinic_id)"
       ]
+    },
+    {
+      "name": "clinic_templates",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin'",
+        "view": "@request.auth.role = 'admin'",
+        "create": "@request.auth.role = 'admin'",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["consultation_pattern", "inventory_menu", "general_settings"]
+        },
+        {
+          "name": "config_data",
+          "type": "json",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "unit_transfers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin' || source_clinic_id = @request.auth.clinic_id || target_clinic_id = @request.auth.clinic_id",
+        "view": "@request.auth.role = 'admin' || source_clinic_id = @request.auth.clinic_id || target_clinic_id = @request.auth.clinic_id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["inventory", "patient_record"]
+        },
+        {
+          "name": "source_clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "target_clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "item_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["pending", "approved", "rejected", "completed"]
+        },
+        {
+          "name": "requested_by",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "approved_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

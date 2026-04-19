@@ -30,6 +30,9 @@ import PendingApproval from './pages/PendingApproval'
 import UnitsComparison from './pages/UnitsComparison'
 import AuditHistory from './pages/AuditHistory'
 import FranchiseManagement from './pages/FranchiseManagement'
+import FranchiseDashboard from './pages/FranchiseDashboard'
+import FranchiseTemplates from './pages/FranchiseTemplates'
+import FranchiseTransfers from './pages/FranchiseTransfers'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -91,6 +94,9 @@ const App = () => (
                 element={<SettingsMaintenanceMigration />}
               />
               <Route path="/admin/franchise" element={<FranchiseManagement />} />
+              <Route path="/admin/franchise/dashboard" element={<FranchiseDashboard />} />
+              <Route path="/admin/franchise/templates" element={<FranchiseTemplates />} />
+              <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
             </Route>
             <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="*" element={<NotFound />} />
