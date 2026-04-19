@@ -66,12 +66,10 @@ export default function Financeiro() {
   const loadData = async () => {
     if (!activeClinic?.id) return
     try {
-      const records = await pb
-        .collection('consultations_finance')
-        .getFullList({
-          expand: 'patient_id,insurance_plan_id,medical_note_id',
-          filter: `clinic_id = "${activeClinic.id}"`,
-        })
+      const records = await pb.collection('consultations_finance').getFullList({
+        expand: 'patient_id,insurance_plan_id,medical_note_id',
+        filter: `clinic_id = "${activeClinic.id}"`,
+      })
       setFinances(records)
       const [pts, pls, s] = await Promise.all([
         pb

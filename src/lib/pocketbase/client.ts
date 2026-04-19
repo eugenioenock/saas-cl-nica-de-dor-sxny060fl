@@ -17,7 +17,9 @@ pb.beforeSend = function (url, options) {
             body.clinic_id = clinicId
             options.body = JSON.stringify(body)
           }
-        } catch (e) {}
+        } catch (e) {
+          // Ignore parse errors
+        }
       } else if (options.body instanceof FormData) {
         if (!options.body.has('clinic_id')) {
           options.body.append('clinic_id', clinicId)

@@ -135,12 +135,10 @@ export default function Inventory() {
         pb
           .collection('clinical_inventory')
           .getFullList({ sort: 'name', filter: `clinic_id = "${activeClinic.id}"` }),
-        pb
-          .collection('inventory_batches')
-          .getFullList({
-            sort: 'expiry_date',
-            filter: `current_quantity > 0 && clinic_id = "${activeClinic.id}"`,
-          }),
+        pb.collection('inventory_batches').getFullList({
+          sort: 'expiry_date',
+          filter: `current_quantity > 0 && clinic_id = "${activeClinic.id}"`,
+        }),
       ])
       setItems(records)
       setBatches(batchRecords)

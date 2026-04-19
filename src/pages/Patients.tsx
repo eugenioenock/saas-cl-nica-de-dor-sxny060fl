@@ -106,13 +106,11 @@ export default function Patients() {
     if (!activeClinic?.id) return
     try {
       const [records, plans] = await Promise.all([
-        pb
-          .collection('patients')
-          .getFullList({
-            sort: '-created',
-            expand: 'insurance_plan_id',
-            filter: `clinic_id = "${activeClinic.id}"`,
-          }),
+        pb.collection('patients').getFullList({
+          sort: '-created',
+          expand: 'insurance_plan_id',
+          filter: `clinic_id = "${activeClinic.id}"`,
+        }),
         pb.collection('insurance_plans').getFullList({ sort: 'name', filter: 'active=true' }),
       ])
       setLocalPatients(records)
