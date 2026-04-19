@@ -18,18 +18,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [clinics, setClinics] = useState<any[]>([])
 
   useEffect(() => {
-    if (user?.clinic_id) {
-      pb.collection('clinic_settings')
-        .getOne(user.clinic_id)
-        .then(setActiveClinic)
-        .catch(console.error)
+    async function loadContext() {
+      if (!user?.id) return
+      try {
+        let accessibleClinics: any[] = []
+        if (user.role === 'admin') {
+          accessibleClinics = await pb.collection('clinic_settings').getFullList({ sort: 'name' })
+        } else {
+          const accessRecords = await pb.collection('user_clinic_access').getFullList({
+            filter: `user_id = "${user.id}"`,
+            expand: 'clinic_id',
+          })
+          accessibleClinics = accessRecords.map((r: any) => r.expand?.clinic_id).filter(Boolean)
+        }
 
-      pb.collection('clinic_settings').getFullList().then(setClinics).catch(console.error)
+        setClinics(accessibleClinics)
+
+        let currentClinic = accessibleClinics.find((c) => c.id === user.clinic_id)
+        if (!currentClinic && accessibleClinics.length > 0) {
+          currentClinic = accessibleClinics[0]
+          await pb.collection('users').update(user.id, { clinic_id: currentClinic.id })
+        }
+
+        if (currentClinic) {
+          setActiveClinic(currentClinic)
+        }
+      } catch (e) {
+        console.error('Failed to load clinic context', e)
+      }
     }
-  }, [user?.clinic_id])
+    loadContext()
+  }, [user?.id, user?.role, user?.clinic_id])
 
   const handleSetActiveClinic = async (clinicId: string) => {
-    if (user?.id) {
+    if (user?.id && clinicId !== user.clinic_id) {
       try {
         await pb.collection('users').update(user.id, { clinic_id: clinicId })
         window.location.reload()

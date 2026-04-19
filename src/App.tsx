@@ -21,6 +21,9 @@ import Orders from './pages/Orders'
 import QuickUsage from './pages/QuickUsage'
 import ReportsPerformance from './pages/ReportsPerformance'
 import Integrations from './pages/Integrations'
+import SettingsAccessControl from './pages/SettingsAccessControl'
+import SettingsMaintenance from './pages/SettingsMaintenance'
+import MatrixDashboard from './pages/MatrixDashboard'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -55,6 +58,7 @@ const App = () => (
             >
               <Route path="/" element={<RouteDispatcher />} />
               <Route path="/dashboard" element={<Index />} />
+              <Route path="/dashboard/matrix" element={<MatrixDashboard />} />
               <Route path="/portal" element={<Portal />} />
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
@@ -69,6 +73,8 @@ const App = () => (
               <Route path="/reports/performance" element={<ReportsPerformance />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/integrations" element={<Integrations />} />
+              <Route path="/settings/access-control" element={<SettingsAccessControl />} />
+              <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

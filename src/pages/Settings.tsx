@@ -7,14 +7,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Trash2, Loader2, Plus } from 'lucide-react'
+import { Trash2, Loader2, Plus, ShieldAlert, Database, BarChart3 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
+import { Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function Settings() {
   const { activeClinic } = useAppContext()
+  const { user } = useAuth()
   const users = mockUsers.filter((u) => u.clinicId === activeClinic?.id)
 
   const [pathologies, setPathologies] = useState<any[]>([])
@@ -137,6 +140,54 @@ export default function Settings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {user?.role === 'admin' && (
+          <Card className="col-span-full border-primary/50 shadow-sm">
+            <CardHeader className="bg-primary/5 border-b">
+              <CardTitle className="text-primary flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Administração Global
+              </CardTitle>
+              <CardDescription>
+                Ferramentas exclusivas para administradores da franquia.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  asChild
+                >
+                  <Link to="/settings/access-control">
+                    <ShieldAlert className="h-6 w-6 text-primary" />
+                    <span>Controle de Acesso</span>
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  asChild
+                >
+                  <Link to="/dashboard/matrix">
+                    <BarChart3 className="h-6 w-6 text-primary" />
+                    <span>Dashboard Matriz</span>
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  asChild
+                >
+                  <Link to="/settings/maintenance">
+                    <Database className="h-6 w-6 text-primary" />
+                    <span>Manutenção de Dados</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="col-span-full">
           <CardHeader>
             <CardTitle>Perfil da Clínica</CardTitle>
