@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Search, Bell, User, Loader2, CheckCheck } from 'lucide-react'
+import { Building2, Search, Bell, User, Loader2, CheckCheck, Moon, Sun } from 'lucide-react'
 import { useAppContext } from '@/hooks/use-app-context'
+import { useTheme } from '@/components/theme-provider'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +38,7 @@ export function AppHeader() {
   const [isLoading, setIsLoading] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const debouncedQuery = useDebounce(query, 300)
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -218,6 +220,19 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? (
+              <Sun className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <Moon className="h-5 w-5 text-muted-foreground" />
+            )}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full relative">

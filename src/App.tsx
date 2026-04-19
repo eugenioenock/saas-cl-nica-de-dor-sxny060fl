@@ -38,6 +38,7 @@ import SignatureAudit from './pages/SignatureAudit'
 import Suppliers from './pages/Suppliers'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth()
@@ -57,62 +58,64 @@ const RouteDispatcher = () => {
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
     <AuthProvider>
-      <AppProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<RouteDispatcher />} />
-              <Route path="/dashboard" element={<Index />} />
-              <Route path="/dashboard/matrix" element={<MatrixDashboard />} />
-              <Route path="/dashboard/units-comparison" element={<UnitsComparison />} />
-              <Route path="/portal" element={<Portal />} />
-              <Route path="/agenda" element={<Agenda />} />
-              <Route path="/pacientes" element={<Patients />} />
-              <Route path="/pacientes/:id" element={<PatientRecord />} />
-              <Route path="/records" element={<RecordsRedirect />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/inventory/orders" element={<Orders />} />
-              <Route path="/inventory/usage/quick" element={<QuickUsage />} />
-              <Route path="/inventory/suppliers" element={<Suppliers />} />
-              <Route path="/financeiro" element={<Financeiro />} />
-              <Route path="/insurance" element={<Insurance />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/reports/performance" element={<ReportsPerformance />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/integrations" element={<Integrations />} />
-              <Route path="/settings/audit-history" element={<AuditHistory />} />
-              <Route path="/settings/signature-audit" element={<SignatureAudit />} />
-              <Route path="/settings/access-control" element={<SettingsAccessControl />} />
-              <Route path="/settings/reports" element={<SettingsReports />} />
-              <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
+      <ThemeProvider>
+        <AppProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/login" element={<Login />} />
               <Route
-                path="/settings/maintenance/migration"
-                element={<SettingsMaintenanceMigration />}
-              />
-              <Route path="/professional/finance" element={<ProfessionalFinance />} />
-              <Route path="/admin/franchise" element={<FranchiseManagement />} />
-              <Route path="/franchise-dashboard" element={<FranchiseDashboard />} />
-              <Route
-                path="/admin/franchise/dashboard"
-                element={<Navigate to="/franchise-dashboard" replace />}
-              />
-              <Route path="/admin/franchise/templates" element={<FranchiseTemplates />} />
-              <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
-            </Route>
-            <Route path="/pending-approval" element={<PendingApproval />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </AppProvider>
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<RouteDispatcher />} />
+                <Route path="/dashboard" element={<Index />} />
+                <Route path="/dashboard/matrix" element={<MatrixDashboard />} />
+                <Route path="/dashboard/units-comparison" element={<UnitsComparison />} />
+                <Route path="/portal" element={<Portal />} />
+                <Route path="/agenda" element={<Agenda />} />
+                <Route path="/pacientes" element={<Patients />} />
+                <Route path="/pacientes/:id" element={<PatientRecord />} />
+                <Route path="/records" element={<RecordsRedirect />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/inventory/orders" element={<Orders />} />
+                <Route path="/inventory/usage/quick" element={<QuickUsage />} />
+                <Route path="/inventory/suppliers" element={<Suppliers />} />
+                <Route path="/financeiro" element={<Financeiro />} />
+                <Route path="/insurance" element={<Insurance />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/reports/performance" element={<ReportsPerformance />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/integrations" element={<Integrations />} />
+                <Route path="/settings/audit-history" element={<AuditHistory />} />
+                <Route path="/settings/signature-audit" element={<SignatureAudit />} />
+                <Route path="/settings/access-control" element={<SettingsAccessControl />} />
+                <Route path="/settings/reports" element={<SettingsReports />} />
+                <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
+                <Route
+                  path="/settings/maintenance/migration"
+                  element={<SettingsMaintenanceMigration />}
+                />
+                <Route path="/professional/finance" element={<ProfessionalFinance />} />
+                <Route path="/admin/franchise" element={<FranchiseManagement />} />
+                <Route path="/franchise-dashboard" element={<FranchiseDashboard />} />
+                <Route
+                  path="/admin/franchise/dashboard"
+                  element={<Navigate to="/franchise-dashboard" replace />}
+                />
+                <Route path="/admin/franchise/templates" element={<FranchiseTemplates />} />
+                <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
+              </Route>
+              <Route path="/pending-approval" element={<PendingApproval />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </AppProvider>
+      </ThemeProvider>
     </AuthProvider>
   </BrowserRouter>
 )
