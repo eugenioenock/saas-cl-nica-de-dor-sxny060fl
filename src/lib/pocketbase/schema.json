@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T18:08:56.141Z",
+  "generatedAt": "2026-04-19T18:13:17.093Z",
   "collections": [
     {
       "name": "users",
@@ -1601,6 +1601,85 @@
         }
       ],
       "indexes": []
+    },
+    {
+      "name": "notifications",
+      "type": "base",
+      "apiRules": {
+        "list": "user_id = @request.auth.id",
+        "view": "user_id = @request.auth.id",
+        "create": null,
+        "update": "user_id = @request.auth.id",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["milestone", "bonus_tier", "system"]
+        },
+        {
+          "name": "is_read",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "threshold_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_notifications_user_read ON notifications (user_id, is_read)"]
     }
   ]
 }

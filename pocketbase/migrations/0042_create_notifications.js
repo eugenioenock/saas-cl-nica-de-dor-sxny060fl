@@ -31,7 +31,7 @@ migrate(
           name: 'clinic_id',
           type: 'relation',
           required: true,
-          collectionId: 'clinic_settings',
+          collectionId: app.findCollectionByNameOrId('clinic_settings').id,
           maxSelect: 1,
         },
         { name: 'threshold_id', type: 'text' },
