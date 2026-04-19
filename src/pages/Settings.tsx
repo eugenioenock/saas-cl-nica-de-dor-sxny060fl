@@ -63,7 +63,9 @@ export default function Settings() {
         .collection('users')
         .getFullList({ filter: `clinic_id = "${activeClinic.id}"` })
       setDbUsers(records)
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error loading users', e)
+    }
   }
 
   const loadClinicSettings = async () => {
