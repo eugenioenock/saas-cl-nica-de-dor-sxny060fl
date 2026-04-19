@@ -22,9 +22,11 @@ import { Plus, Loader2 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { useAppContext } from '@/hooks/use-app-context'
 
 export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans: any[] }) {
   const { toast } = useToast()
+  const { activeClinic } = useAppContext()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -98,6 +100,7 @@ export function FinanceFormDialog({ patients, plans }: { patients: any[]; plans:
             ? formData.medical_note_id
             : null,
         insurance_plan_id: formData.insurance_plan_id || null,
+        clinic_id: activeClinic?.id,
       }
       await pb.collection('consultations_finance').create(payload)
       setIsOpen(false)

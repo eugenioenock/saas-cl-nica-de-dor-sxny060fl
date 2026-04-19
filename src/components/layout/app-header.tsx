@@ -53,7 +53,7 @@ export function AppHeader() {
       }
       setIsLoading(true)
       try {
-        const data = await searchPatients(debouncedQuery)
+        const data = await searchPatients(debouncedQuery, activeClinic?.id)
         setResults(data.items)
       } catch (error) {
         console.error('Failed to search patients', error)
@@ -81,7 +81,7 @@ export function AppHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 px-2 font-semibold">
-                {activeClinic.name}
+                {activeClinic?.name || 'Carregando...'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -91,7 +91,7 @@ export function AppHeader() {
                 <DropdownMenuItem
                   key={clinic.id}
                   onClick={() => setActiveClinic(clinic.id)}
-                  className={clinic.id === activeClinic.id ? 'bg-accent' : ''}
+                  className={clinic.id === activeClinic?.id ? 'bg-accent' : ''}
                 >
                   {clinic.name}
                 </DropdownMenuItem>

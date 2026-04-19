@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import { getPatients, type Patient } from '@/services/patients'
 import { getUsers, type User } from '@/services/users'
 import { useAuth } from '@/hooks/use-auth'
+import { useAppContext } from '@/hooks/use-app-context'
 import {
   createAppointment,
   updateAppointment,
@@ -78,16 +79,19 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
   const [openCb, setOpenCb] = useState(false)
   const [openUserCb, setOpenUserCb] = useState(false)
   const [saving, setSaving] = useState(false)
+  const { activeClinic } = useAppContext()
 
   const form = useForm<z.infer<typeof formSchema>>({ resolver: zodResolver(formSchema) })
 
   useEffect(() => {
-    if (open) {
-      getPatients()
+    if (open && activeClinic?.id) {
+      getPatients(activeClinic.id)
         .then(setPatients)
         .catch(() => {})
       getUsers()
-        .then(setUsers)
+        .then((allUsers) =>
+          setUsers(allUsers.filter((u) => u.clinic_id === activeClinic.id || !u.clinic_id)),
+        )
         .catch(() => {})
     }
   }, [open])
@@ -150,6 +154,7 @@ export function AppointmentSheet({ open, onOpenChange, selectedDate, appointment
         notes: v.notes,
         start_time: new Date(`${v.date}T${v.startTime}`).toISOString(),
         end_time: new Date(`${v.date}T${v.endTime}`).toISOString(),
+        clinic_id: activeClinic?.id,
       }
       if (appointment) await updateAppointment(appointment.id, payload)
       else await createAppointment(payload)

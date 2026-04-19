@@ -1,33 +1,52 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { Clinic, Franchise, User, mockClinics, mockFranchises, mockUsers } from '@/lib/data'
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import pb from '@/lib/pocketbase/client'
 
 type AppContextType = {
-  currentUser: User
-  activeClinic: Clinic
-  activeFranchise: Franchise
+  currentUser: any
+  activeClinic: any
+  activeFranchise: any
   setActiveClinic: (clinicId: string) => void
-  clinics: Clinic[]
+  clinics: any[]
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [currentUser] = useState<User>(mockUsers[0])
-  const [activeClinicId, setActiveClinicId] = useState<string>(currentUser.clinicId)
+  const { user } = useAuth()
+  const [activeClinic, setActiveClinic] = useState<any>({ name: 'Carregando...' })
+  const [clinics, setClinics] = useState<any[]>([])
 
-  const activeClinic = mockClinics.find((c) => c.id === activeClinicId) || mockClinics[0]
-  const activeFranchise =
-    mockFranchises.find((f) => f.id === activeClinic.franchiseId) || mockFranchises[0]
-  const availableClinics = mockClinics.filter((c) => c.franchiseId === activeFranchise.id)
+  useEffect(() => {
+    if (user?.clinic_id) {
+      pb.collection('clinic_settings')
+        .getOne(user.clinic_id)
+        .then(setActiveClinic)
+        .catch(console.error)
+
+      pb.collection('clinic_settings').getFullList().then(setClinics).catch(console.error)
+    }
+  }, [user?.clinic_id])
+
+  const handleSetActiveClinic = async (clinicId: string) => {
+    if (user?.id) {
+      try {
+        await pb.collection('users').update(user.id, { clinic_id: clinicId })
+        window.location.reload()
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }
 
   return (
     <AppContext.Provider
       value={{
-        currentUser,
+        currentUser: user || { name: 'Usuário' },
         activeClinic,
-        activeFranchise,
-        setActiveClinic: setActiveClinicId,
-        clinics: availableClinics,
+        activeFranchise: { name: 'SpineCare OS' },
+        setActiveClinic: handleSetActiveClinic,
+        clinics,
       }}
     >
       {children}

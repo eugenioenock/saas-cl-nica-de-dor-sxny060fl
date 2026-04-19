@@ -10,14 +10,19 @@ export interface Patient {
   updated: string
 }
 
-export const getPatients = () =>
-  pb.collection('patients').getFullList<Patient>({
+export const getPatients = (clinicId?: string) => {
+  const filter = clinicId ? pb.filter('clinic_id = {:c}', { c: clinicId }) : ''
+  return pb.collection('patients').getFullList<Patient>({
     sort: 'name',
+    filter,
   })
+}
 
-export const searchPatients = (query: string) => {
+export const searchPatients = (query: string, clinicId?: string) => {
+  const baseFilter = pb.filter('name ~ {:q} || document ~ {:q}', { q: query })
+  const filter = clinicId ? `${baseFilter} && clinic_id = "${clinicId}"` : baseFilter
   return pb.collection('patients').getList<Patient>(1, 10, {
-    filter: pb.filter('name ~ {:q} || document ~ {:q}', { q: query }),
+    filter,
     sort: 'name',
   })
 }

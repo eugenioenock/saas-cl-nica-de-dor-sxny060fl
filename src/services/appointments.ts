@@ -18,12 +18,15 @@ export interface Appointment {
   }
 }
 
-export const getAppointments = (start: string, end: string) =>
-  pb.collection('appointments').getFullList<Appointment>({
-    filter: `start_time >= "${start}" && start_time <= "${end}"`,
+export const getAppointments = (start: string, end: string, clinicId?: string) => {
+  let filter = `start_time >= "${start}" && start_time <= "${end}"`
+  if (clinicId) filter += ` && clinic_id = "${clinicId}"`
+  return pb.collection('appointments').getFullList<Appointment>({
+    filter,
     expand: 'patient_id,professional_id',
     sort: 'start_time',
   })
+}
 
 export const createAppointment = (data: Partial<Appointment>) =>
   pb.collection('appointments').create<Appointment>(data)

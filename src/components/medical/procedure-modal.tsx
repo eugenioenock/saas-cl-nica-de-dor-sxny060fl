@@ -84,6 +84,7 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
         title: 'Procedimento Realizado',
         status: 'completed',
         notes: values.procedure,
+        clinic_id: activeClinic?.id,
       })
 
       const materials = values.materials as MaterialUsage[] | undefined
@@ -101,6 +102,7 @@ export function ProcedureModal({ patientId, onAdd }: ProcedureModalProps) {
             signature_hash: mat.isHighCost
               ? btoa(values.signature + '-' + Date.now()).substring(0, 15)
               : '',
+            clinic_id: activeClinic?.id,
           })
         }
       }

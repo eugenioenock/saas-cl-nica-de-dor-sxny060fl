@@ -74,6 +74,7 @@ export default function Inventory() {
   const [traceLogs, setTraceLogs] = useState<any[]>([])
 
   const { user } = useAuth()
+  const { activeClinic } = useAppContext()
 
   const handleSaveCount = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +93,7 @@ export default function Inventory() {
         actual_quantity: actual,
         discrepancy,
         professional_id: user?.id,
+        clinic_id: activeClinic?.id,
       })
 
       if (discrepancy !== 0) {
@@ -127,12 +129,18 @@ export default function Inventory() {
   })
 
   const loadData = async () => {
+    if (!activeClinic?.id) return
     try {
       const [records, batchRecords] = await Promise.all([
-        pb.collection('clinical_inventory').getFullList({ sort: 'name' }),
+        pb
+          .collection('clinical_inventory')
+          .getFullList({ sort: 'name', filter: `clinic_id = "${activeClinic.id}"` }),
         pb
           .collection('inventory_batches')
-          .getFullList({ sort: 'expiry_date', filter: 'current_quantity > 0' }),
+          .getFullList({
+            sort: 'expiry_date',
+            filter: `current_quantity > 0 && clinic_id = "${activeClinic.id}"`,
+          }),
       ])
       setItems(records)
       setBatches(batchRecords)
@@ -145,7 +153,7 @@ export default function Inventory() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeClinic?.id])
 
   useRealtime('clinical_inventory', loadData)
   useRealtime('inventory_batches', loadData)
@@ -164,6 +172,7 @@ export default function Inventory() {
         is_high_cost: formData.is_high_cost,
         barcode: formData.barcode,
         current_quantity: editingId ? undefined : 0,
+        clinic_id: activeClinic?.id,
       }
 
       if (editingId) {
@@ -200,6 +209,7 @@ export default function Inventory() {
         supplier: batchForm.supplier,
         cost_price: batchForm.cost_price ? parseFloat(batchForm.cost_price) : 0,
         purchase_date: new Date().toISOString(),
+        clinic_id: activeClinic?.id,
       }
 
       await pb.collection('inventory_batches').create(payload)

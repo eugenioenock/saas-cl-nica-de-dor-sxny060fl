@@ -103,9 +103,16 @@ export default function Patients() {
   }, [selectedPathology])
 
   const loadData = async () => {
+    if (!activeClinic?.id) return
     try {
       const [records, plans] = await Promise.all([
-        pb.collection('patients').getFullList({ sort: '-created', expand: 'insurance_plan_id' }),
+        pb
+          .collection('patients')
+          .getFullList({
+            sort: '-created',
+            expand: 'insurance_plan_id',
+            filter: `clinic_id = "${activeClinic.id}"`,
+          }),
         pb.collection('insurance_plans').getFullList({ sort: 'name', filter: 'active=true' }),
       ])
       setLocalPatients(records)
@@ -119,7 +126,7 @@ export default function Patients() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeClinic?.id])
 
   useRealtime('patients', () => {
     loadData()
@@ -127,7 +134,6 @@ export default function Patients() {
 
   const patients = localPatients.filter(
     (p) =>
-      (!p.clinicId || p.clinicId === activeClinic.id) &&
       (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.document?.includes(searchTerm)) &&
       (filteredPatientIds === null || filteredPatientIds.has(p.id)),
@@ -155,7 +161,7 @@ export default function Patients() {
         ...formData,
         insurance_plan_id: formData.insurance_plan_id === 'none' ? '' : formData.insurance_plan_id,
         dob: formData.dob ? new Date(formData.dob).toISOString().replace('T', ' ') : '',
-        clinicId: activeClinic.id,
+        clinic_id: activeClinic.id,
       }
       await pb.collection('patients').create(payload)
       setIsOpen(false)

@@ -8,16 +8,21 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { Navigate } from 'react-router-dom'
+import { useAppContext } from '@/hooks/use-app-context'
 
 export default function Integrations() {
   const { user } = useAuth()
+  const { activeClinic } = useAppContext()
   const [integrations, setIntegrations] = useState<any[]>([])
   const [editing, setEditing] = useState<any>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
 
   const loadData = async () => {
+    if (!activeClinic?.id) return
     try {
-      const records = await pb.collection('integrations').getFullList({ sort: '-created' })
+      const records = await pb
+        .collection('integrations')
+        .getFullList({ sort: '-created', filter: `clinic_id = "${activeClinic.id}"` })
       setIntegrations(records)
     } catch (e) {
       console.error(e)
@@ -26,7 +31,7 @@ export default function Integrations() {
 
   useEffect(() => {
     if (user?.role === 'admin') loadData()
-  }, [user])
+  }, [user, activeClinic?.id])
 
   useRealtime('integrations', loadData, user?.role === 'admin')
 
@@ -49,7 +54,7 @@ export default function Integrations() {
         await pb.collection('integrations').update(data.id, data)
         toast.success('Integração atualizada com sucesso')
       } else {
-        await pb.collection('integrations').create(data)
+        await pb.collection('integrations').create({ ...data, clinic_id: activeClinic?.id })
         toast.success('Nova integração adicionada')
       }
       setIsEditorOpen(false)

@@ -31,12 +31,14 @@ import { format } from 'date-fns'
 import { CheckCircle2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAppContext } from '@/hooks/use-app-context'
 
 export default function Orders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const { toast } = useToast()
+  const { activeClinic } = useAppContext()
 
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -50,10 +52,12 @@ export default function Orders() {
   })
 
   const loadOrders = async () => {
+    if (!activeClinic?.id) return
     try {
       const records = await pb.collection('purchase_orders').getFullList({
         sort: '-created',
         expand: 'material_id',
+        filter: `clinic_id = "${activeClinic.id}"`,
       })
       setOrders(records)
     } catch (e) {
@@ -65,7 +69,7 @@ export default function Orders() {
 
   useEffect(() => {
     loadOrders()
-  }, [])
+  }, [activeClinic?.id])
 
   useRealtime('purchase_orders', loadOrders)
 
@@ -106,6 +110,7 @@ export default function Orders() {
         supplier: batchData.supplier,
         purchase_date: new Date().toISOString(),
         cost_price: batchData.cost_price,
+        clinic_id: activeClinic?.id,
       })
 
       await pb.collection('purchase_orders').update(selectedOrder.id, { status: 'received' })

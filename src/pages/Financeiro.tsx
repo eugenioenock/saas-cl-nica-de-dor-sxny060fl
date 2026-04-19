@@ -42,9 +42,11 @@ import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { FinanceFormDialog } from '@/components/finance/finance-form-dialog'
 import { ReceiptDocument } from '@/components/finance/receipt-document'
+import { useAppContext } from '@/hooks/use-app-context'
 
 export default function Financeiro() {
   const { toast } = useToast()
+  const { activeClinic } = useAppContext()
   const [finances, setFinances] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
   const [plans, setPlans] = useState<any[]>([])
@@ -62,22 +64,28 @@ export default function Financeiro() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const loadData = async () => {
+    if (!activeClinic?.id) return
     try {
       const records = await pb
         .collection('consultations_finance')
-        .getFullList({ expand: 'patient_id,insurance_plan_id,medical_note_id' })
+        .getFullList({
+          expand: 'patient_id,insurance_plan_id,medical_note_id',
+          filter: `clinic_id = "${activeClinic.id}"`,
+        })
       setFinances(records)
       const [pts, pls, s] = await Promise.all([
-        pb.collection('patients').getFullList({ sort: 'name' }),
+        pb
+          .collection('patients')
+          .getFullList({ sort: 'name', filter: `clinic_id = "${activeClinic.id}"` }),
         pb.collection('insurance_plans').getFullList({ sort: 'name', filter: 'active=true' }),
         pb
           .collection('clinic_settings')
-          .getList(1, 1)
+          .getOne(activeClinic.id)
           .catch(() => null),
       ])
       setPatients(pts)
       setPlans(pls)
-      if (s?.items.length) setSettings(s.items[0])
+      if (s) setSettings(s)
     } catch (e) {
       console.error(e)
     } finally {
@@ -87,7 +95,7 @@ export default function Financeiro() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeClinic?.id])
   useRealtime('consultations_finance', loadData)
   useRealtime('patients', loadData)
 

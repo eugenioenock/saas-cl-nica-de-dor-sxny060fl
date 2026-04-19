@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getAppointments, type Appointment } from '@/services/appointments'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAppContext } from '@/hooks/use-app-context'
 import { AppointmentSheet } from '@/components/agenda/appointment-sheet'
 import { cn } from '@/lib/utils'
 
@@ -38,19 +39,21 @@ export default function AgendaPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedAppt, setSelectedAppt] = useState<Appointment | undefined>()
+  const { activeClinic } = useAppContext()
 
   const loadData = useCallback(async () => {
+    if (!activeClinic?.id) return
     const start = startOfWeek(startOfMonth(currentMonth))
     const end = endOfWeek(endOfMonth(currentMonth))
     try {
-      const res = await getAppointments(start.toISOString(), end.toISOString())
+      const res = await getAppointments(start.toISOString(), end.toISOString(), activeClinic.id)
       setAppointments(res)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [currentMonth])
+  }, [currentMonth, activeClinic?.id])
 
   useEffect(() => {
     loadData()
