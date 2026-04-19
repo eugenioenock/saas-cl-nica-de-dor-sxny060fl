@@ -33,6 +33,7 @@ import FranchiseManagement from './pages/FranchiseManagement'
 import FranchiseDashboard from './pages/FranchiseDashboard'
 import FranchiseTemplates from './pages/FranchiseTemplates'
 import FranchiseTransfers from './pages/FranchiseTransfers'
+import ProfessionalFinance from './pages/ProfessionalFinance'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -93,6 +94,7 @@ const App = () => (
                 path="/settings/maintenance/migration"
                 element={<SettingsMaintenanceMigration />}
               />
+              <Route path="/professional/finance" element={<ProfessionalFinance />} />
               <Route path="/admin/franchise" element={<FranchiseManagement />} />
               <Route path="/franchise-dashboard" element={<FranchiseDashboard />} />
               <Route

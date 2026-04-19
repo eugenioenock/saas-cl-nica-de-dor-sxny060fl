@@ -40,6 +40,7 @@ const adminNavItems = [
   { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
   { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
   { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
+  { title: 'Meu Financeiro', icon: DollarSign, url: '/professional/finance' },
   { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },
   { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
@@ -79,9 +80,18 @@ export function AppSidebar() {
   const navItems = isPatient
     ? patientNavItems
     : adminNavItems.filter((item) => {
-        if (user?.role === 'admin' || user?.role === 'manager') return true
+        if (user?.role === 'admin' || user?.role === 'manager') {
+          return item.url !== '/professional/finance'
+        }
         if (user?.role === 'professional') {
-          return ['/dashboard', '/agenda', '/pacientes', '/records', '/reports'].includes(item.url)
+          return [
+            '/dashboard',
+            '/agenda',
+            '/pacientes',
+            '/records',
+            '/reports',
+            '/professional/finance',
+          ].includes(item.url)
         }
         if (user?.role === 'receptionist') {
           return ['/dashboard', '/agenda', '/pacientes'].includes(item.url)

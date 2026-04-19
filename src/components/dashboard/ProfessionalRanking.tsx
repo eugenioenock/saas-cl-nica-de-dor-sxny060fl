@@ -22,15 +22,44 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Trophy, Medal, Info, Loader2, AlertCircle, Settings2 } from 'lucide-react'
+import {
+  Trophy,
+  Medal,
+  Info,
+  Loader2,
+  AlertCircle,
+  Settings2,
+  Download,
+  Calculator,
+  FileSpreadsheet,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { BonusSimulator } from './BonusSimulator'
 
 export function ProfessionalRanking() {
   const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('current_month')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
   const [bonusConfig, setBonusConfig] = useState<any>(null)
+  const [maxValues, setMaxValues] = useState({ rev: 1, vol: 1 })
 
   const loadData = async () => {
     if (!user?.clinic_id) return
@@ -47,11 +76,22 @@ export function ProfessionalRanking() {
         endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
           .toISOString()
           .replace('T', ' ')
-      } else {
+      } else if (period === 'last_month') {
         startOfMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
           .toISOString()
           .replace('T', ' ')
         endOfMonth = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59)
+          .toISOString()
+          .replace('T', ' ')
+      } else if (period === 'custom' && customStart && customEnd) {
+        startOfMonth = `${customStart} 00:00:00`
+        endOfMonth = `${customEnd} 23:59:59`
+      } else if (period === 'custom') {
+        // Fallback to current month if custom dates not fully selected
+        startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+          .toISOString()
+          .replace('T', ' ')
+        endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
           .toISOString()
           .replace('T', ' ')
       }
@@ -113,6 +153,8 @@ export function ProfessionalRanking() {
       const maxRev = Math.max(...stats.map((s) => s.revenue), 1)
       const maxVol = Math.max(...stats.map((s) => s.volume), 1)
 
+      setMaxValues({ rev: maxRev, vol: maxVol })
+
       const processedData = stats
         .map((s) => {
           const revScore = (s.revenue / maxRev) * 40
@@ -155,8 +197,50 @@ export function ProfessionalRanking() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [user?.clinic_id, period])
+    if (period !== 'custom' || (period === 'custom' && customStart && customEnd)) {
+      loadData()
+    }
+  }, [user?.clinic_id, period, customStart, customEnd])
+
+  const handleExportCSV = () => {
+    const headers = [
+      'Profissional',
+      'Período',
+      'Receita Total',
+      'Receita Paga',
+      'Score de Performance',
+      'Bônus Base',
+      'Multiplicador',
+      'Bônus Total',
+    ]
+    const periodLabel =
+      period === 'current_month'
+        ? 'Mês Atual'
+        : period === 'last_month'
+          ? 'Mês Anterior'
+          : `${customStart} até ${customEnd}`
+
+    const rows = data.map((item) => [
+      `"${item.name}"`,
+      `"${periodLabel}"`,
+      item.revenue.toFixed(2),
+      item.paidRevenue.toFixed(2),
+      item.score.toFixed(1),
+      item.revenueShare.toFixed(2),
+      item.multiplier,
+      item.estimatedBonus.toFixed(2),
+    ])
+
+    const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `folha_bonus_${period}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   useRealtime(
     'appointments',
@@ -209,15 +293,76 @@ export function ProfessionalRanking() {
               Desempenho baseado em Receita (40%), Volume (30%) e Eficiência (30%).
             </CardDescription>
           </div>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Selecione o período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current_month">Mês Atual</SelectItem>
-              <SelectItem value="last_month">Mês Anterior</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            {(user?.role === 'admin' || user?.role === 'manager') && (
+              <>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Simular Bônus
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                      <DialogTitle>Simulador Interativo</DialogTitle>
+                      <DialogDescription>
+                        Ajuste as variáveis para simular ganhos e bônus da equipe.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <BonusSimulator
+                      bonusConfig={bonusConfig}
+                      maxRev={maxValues.rev}
+                      maxVol={maxValues.vol}
+                    />
+                  </DialogContent>
+                </Dialog>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Folha de Bônus (CSV)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+
+            {period === 'custom' && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="w-[130px] h-9 text-xs"
+                />
+                <span className="text-muted-foreground">-</span>
+                <Input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="w-[130px] h-9 text-xs"
+                />
+              </div>
+            )}
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current_month">Mês Atual</SelectItem>
+                <SelectItem value="last_month">Mês Anterior</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {user?.role === 'admin' && !isConfigured && !loading && (
