@@ -89,6 +89,7 @@ export default function PatientRecord() {
   const { id } = useParams()
   const { user } = useAuth()
   const [isAdjusting, setIsAdjusting] = useState(false)
+  const [isSavingAdjustments, setIsSavingAdjustments] = useState(false)
   const [draftPoints, setDraftPoints] = useState<any[]>([])
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -130,14 +131,47 @@ export default function PatientRecord() {
   })
   const [isSubmittingUsage, setIsSubmittingUsage] = useState(false)
 
-  const toggleAdjustMode = () => {
-    if (isAdjusting) {
+  const startAdjusting = () => {
+    setIsAdjusting(true)
+    setDraftPoints(JSON.parse(JSON.stringify(data.points)))
+  }
+
+  const cancelAdjusting = () => {
+    setIsAdjusting(false)
+    setDraftPoints([])
+    setDraggingPointId(null)
+  }
+
+  const saveAdjustments = async () => {
+    setIsSavingAdjustments(true)
+    try {
+      let hasChanges = false
+      const updatedLocalPoints = [...data.points]
+
+      for (const draft of draftPoints) {
+        const original = data.points.find((p: any) => p.id === draft.id)
+        if (original && (original.x !== draft.x || original.y !== draft.y)) {
+          await pb.collection('pain_points').update(draft.id, { x: draft.x, y: draft.y })
+          hasChanges = true
+          const idx = updatedLocalPoints.findIndex((p) => p.id === draft.id)
+          if (idx !== -1) {
+            updatedLocalPoints[idx] = { ...updatedLocalPoints[idx], x: draft.x, y: draft.y }
+          }
+        }
+      }
+
+      if (hasChanges) {
+        setData((prev: any) => ({ ...prev, points: updatedLocalPoints }))
+        toast.success('Posições salvas com sucesso!')
+      }
+
       setIsAdjusting(false)
       setDraftPoints([])
       setDraggingPointId(null)
-    } else {
-      setIsAdjusting(true)
-      setDraftPoints(JSON.parse(JSON.stringify(data.points)))
+    } catch (err) {
+      toast.error('Erro ao salvar posições. Tente novamente.')
+    } finally {
+      setIsSavingAdjustments(false)
     }
   }
 
@@ -399,11 +433,22 @@ export default function PatientRecord() {
                       </TooltipContent>
                     </Tooltip>
                   ) : isAdjusting ? (
-                    <Button size="sm" onClick={toggleAdjustMode}>
-                      Concluir Ajustes
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={cancelAdjusting}
+                        disabled={isSavingAdjustments}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={saveAdjustments} disabled={isSavingAdjustments}>
+                        {isSavingAdjustments && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Concluir Ajustes
+                      </Button>
+                    </>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={toggleAdjustMode}>
+                    <Button size="sm" variant="outline" onClick={startAdjusting}>
                       Ajustar Marcadores
                     </Button>
                   )}
@@ -479,28 +524,10 @@ export default function PatientRecord() {
                             prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
                           )
                         }}
-                        onPointerUp={async (e) => {
+                        onPointerUp={(e) => {
                           if (!isAdjusting || draggingPointId !== pt.id) return
                           e.currentTarget.releasePointerCapture(e.pointerId)
                           setDraggingPointId(null)
-
-                          const updatedPoint = draftPoints.find((p) => p.id === pt.id)
-                          const originalPoint = data.points.find((p: any) => p.id === pt.id)
-                          if (
-                            updatedPoint &&
-                            originalPoint &&
-                            (updatedPoint.x !== originalPoint.x ||
-                              updatedPoint.y !== originalPoint.y)
-                          ) {
-                            try {
-                              await pb
-                                .collection('pain_points')
-                                .update(pt.id, { x: updatedPoint.x, y: updatedPoint.y })
-                              toast.success('Posição salva com sucesso')
-                            } catch (err) {
-                              toast.error('Erro ao salvar posição')
-                            }
-                          }
                         }}
                         className={cn(
                           'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
