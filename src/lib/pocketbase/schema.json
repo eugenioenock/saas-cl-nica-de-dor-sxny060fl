@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:09:52.021Z",
+  "generatedAt": "2026-04-19T17:13:47.106Z",
   "collections": [
     {
       "name": "users",
@@ -64,6 +64,13 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pending", "active", "rejected"]
         }
       ],
       "indexes": [
@@ -1181,6 +1188,120 @@
           "required": true,
           "system": false,
           "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "report_schedules",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "view": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "create": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "update": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "delete": "@request.auth.role = 'admin' || @request.auth.role = 'manager'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "frequency",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["daily", "weekly", "monthly"]
+        },
+        {
+          "name": "recipients",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "report_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["financial_summary", "inventory_audit", "clinical_performance"]
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "report_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "view": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "report_schedules"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "details",
+          "type": "text",
+          "required": false,
+          "system": false
         },
         {
           "name": "created",
