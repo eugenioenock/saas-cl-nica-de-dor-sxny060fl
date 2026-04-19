@@ -186,20 +186,13 @@ export function BodyMap({ patientId }: { patientId: string }) {
             />
 
             {ANATOMY_REGIONS.map((region) => {
-              const pt = points.find((p) => p.name === region.name)
-              const isActive = !!pt
-              const isHovered = pt ? hoveredPointId === pt.id : false
+              const isActive = points.some((p: any) => p.name === region.name)
+              if (isActive) return null
 
               return (
                 <div
                   key={region.id}
-                  className={cn(
-                    'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
-                    isActive
-                      ? 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]'
-                      : 'hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50',
-                    isHovered && isActive && 'ring-2 ring-white/50 scale-110',
-                  )}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
                   style={{
                     left: `${region.x}%`,
                     top: `${region.y}%`,
@@ -208,15 +201,40 @@ export function BodyMap({ patientId }: { patientId: string }) {
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleRegionClick(region, pt)
-                  }}
-                  onMouseEnter={() => {
-                    if (isActive && pt) setHoveredPointId(pt.id)
-                  }}
-                  onMouseLeave={() => {
-                    if (isActive && pt) setHoveredPointId(null)
+                    handleRegionClick(region, null)
                   }}
                   title={region.name}
+                />
+              )
+            })}
+
+            {points.map((pt: any) => {
+              const region = ANATOMY_REGIONS.find((r) => r.name === pt.name)
+              const w = region ? region.w : 10
+              const h = region ? region.h : 10
+              const isHovered = hoveredPointId === pt.id
+
+              return (
+                <div
+                  key={pt.id}
+                  className={cn(
+                    'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
+                    'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
+                    isHovered && 'ring-2 ring-white/50 scale-110',
+                  )}
+                  style={{
+                    left: `${pt.x}%`,
+                    top: `${pt.y}%`,
+                    width: `${w}%`,
+                    height: `${h}%`,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
+                  }}
+                  onMouseEnter={() => setHoveredPointId(pt.id)}
+                  onMouseLeave={() => setHoveredPointId(null)}
+                  title={pt.name || 'Ponto'}
                 />
               )
             })}

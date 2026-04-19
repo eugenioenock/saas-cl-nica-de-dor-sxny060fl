@@ -500,8 +500,8 @@ export default function PatientRecord() {
                           const rect = containerRef.current.getBoundingClientRect()
                           let x = ((e.clientX - rect.left) / rect.width) * 100
                           let y = ((e.clientY - rect.top) / rect.height) * 100
-                          x = Math.max(0, Math.min(100, x))
-                          y = Math.max(0, Math.min(100, y))
+                          x = Number(Math.max(0, Math.min(100, x)).toFixed(1))
+                          y = Number(Math.max(0, Math.min(100, y)).toFixed(1))
                           setDraftPoints((prev) =>
                             prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
                           )
@@ -539,7 +539,7 @@ export default function PatientRecord() {
                       >
                         {isAdjusting && draggingPointId === pt.id && (
                           <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
-                            {Math.round(pt.x)}%, {Math.round(pt.y)}%
+                            {pt.x.toFixed(1)}%, {pt.y.toFixed(1)}%
                           </div>
                         )}
                       </div>
