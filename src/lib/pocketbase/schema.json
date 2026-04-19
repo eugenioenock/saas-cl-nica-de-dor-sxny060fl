@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:53:49.440Z",
+  "generatedAt": "2026-04-19T18:00:21.033Z",
   "collections": [
     {
       "name": "users",
@@ -451,6 +451,12 @@
         {
           "name": "state",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bonus_config",
+          "type": "json",
           "required": false,
           "system": false
         }

@@ -34,6 +34,10 @@ export default function Settings() {
     closing_time: '',
     region: '',
     state: '',
+    bonus_config: {
+      revenue_percentage: 0,
+      performance_thresholds: [] as { min_score: number; multiplier: number }[],
+    },
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoUrl, setLogoUrl] = useState('')
@@ -65,6 +69,10 @@ export default function Settings() {
           closing_time: record.closing_time || '18:00',
           region: record.region || '',
           state: record.state || '',
+          bonus_config: record.bonus_config || {
+            revenue_percentage: 0,
+            performance_thresholds: [],
+          },
         })
         if (record.logo) {
           setLogoUrl(pb.files.getURL(record, record.logo))
@@ -93,6 +101,7 @@ export default function Settings() {
       formData.append('closing_time', clinicSettings.closing_time)
       formData.append('region', clinicSettings.region)
       formData.append('state', clinicSettings.state)
+      formData.append('bonus_config', JSON.stringify(clinicSettings.bonus_config))
       if (logoFile) {
         formData.append('logo', logoFile)
       }
@@ -193,6 +202,145 @@ export default function Settings() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle>Regras de Bônus e Comissionamento</CardTitle>
+            <CardDescription>
+              Configure as regras de comissionamento baseadas em receita e desempenho.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="revenue-percentage">Percentual de Repasse da Receita (%)</Label>
+                  <Input
+                    id="revenue-percentage"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={clinicSettings.bonus_config.revenue_percentage}
+                    onChange={(e) =>
+                      setClinicSettings({
+                        ...clinicSettings,
+                        bonus_config: {
+                          ...clinicSettings.bonus_config,
+                          revenue_percentage: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Percentual base calculado sobre a receita paga do profissional.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Multiplicadores de Desempenho (Score)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setClinicSettings({
+                          ...clinicSettings,
+                          bonus_config: {
+                            ...clinicSettings.bonus_config,
+                            performance_thresholds: [
+                              ...clinicSettings.bonus_config.performance_thresholds,
+                              { min_score: 80, multiplier: 1.0 },
+                            ],
+                          },
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Adicionar Faixa
+                    </Button>
+                  </div>
+
+                  {clinicSettings.bonus_config.performance_thresholds.map((threshold, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs">Score Mínimo</Label>
+                        <Input
+                          type="number"
+                          value={threshold.min_score}
+                          onChange={(e) => {
+                            const newThresholds = [
+                              ...clinicSettings.bonus_config.performance_thresholds,
+                            ]
+                            newThresholds[index].min_score = parseFloat(e.target.value) || 0
+                            setClinicSettings({
+                              ...clinicSettings,
+                              bonus_config: {
+                                ...clinicSettings.bonus_config,
+                                performance_thresholds: newThresholds,
+                              },
+                            })
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs">Multiplicador do Bônus</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={threshold.multiplier}
+                          onChange={(e) => {
+                            const newThresholds = [
+                              ...clinicSettings.bonus_config.performance_thresholds,
+                            ]
+                            newThresholds[index].multiplier = parseFloat(e.target.value) || 0
+                            setClinicSettings({
+                              ...clinicSettings,
+                              bonus_config: {
+                                ...clinicSettings.bonus_config,
+                                performance_thresholds: newThresholds,
+                              },
+                            })
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-6 text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          const newThresholds =
+                            clinicSettings.bonus_config.performance_thresholds.filter(
+                              (_, i) => i !== index,
+                            )
+                          setClinicSettings({
+                            ...clinicSettings,
+                            bonus_config: {
+                              ...clinicSettings.bonus_config,
+                              performance_thresholds: newThresholds,
+                            },
+                          })
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {clinicSettings.bonus_config.performance_thresholds.length === 0 && (
+                    <p className="text-sm text-muted-foreground border border-dashed rounded-md p-4 text-center">
+                      Nenhuma faixa de desempenho configurada. O multiplicador padrão será 1x.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button type="submit" disabled={savingSettings}>
+                {savingSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Regras de Bônus
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
         <Card className="col-span-full">
           <CardHeader>

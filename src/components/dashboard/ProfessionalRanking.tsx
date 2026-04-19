@@ -13,46 +13,71 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Trophy, Medal, Info, Loader2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Trophy, Medal, Info, Loader2, AlertCircle, Settings2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function ProfessionalRanking() {
   const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState('current_month')
+  const [bonusConfig, setBonusConfig] = useState<any>(null)
 
   const loadData = async () => {
     if (!user?.clinic_id) return
     try {
+      setLoading(true)
       const today = new Date()
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-        .toISOString()
-        .replace('T', ' ')
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
-        .toISOString()
-        .replace('T', ' ')
+      let startOfMonth = ''
+      let endOfMonth = ''
 
-      const [professionals, appointments, finance, notes] = await Promise.all([
+      if (period === 'current_month') {
+        startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+          .toISOString()
+          .replace('T', ' ')
+        endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
+          .toISOString()
+          .replace('T', ' ')
+      } else {
+        startOfMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+          .toISOString()
+          .replace('T', ' ')
+        endOfMonth = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59)
+          .toISOString()
+          .replace('T', ' ')
+      }
+
+      const [professionals, appointments, finance, notes, clinic] = await Promise.all([
         pb
           .collection('users')
           .getFullList({ filter: `role = 'professional' && clinic_id = "${user.clinic_id}"` }),
-        pb
-          .collection('appointments')
-          .getFullList({
-            filter: `start_time >= "${startOfMonth}" && start_time <= "${endOfMonth}" && clinic_id = "${user.clinic_id}"`,
-          }),
-        pb
-          .collection('consultations_finance')
-          .getFullList({
-            filter: `created >= "${startOfMonth}" && created <= "${endOfMonth}" && clinic_id = "${user.clinic_id}" && status != 'cancelled'`,
-          }),
-        pb
-          .collection('medical_notes')
-          .getFullList({
-            filter: `created >= "${startOfMonth}" && created <= "${endOfMonth}" && clinic_id = "${user.clinic_id}"`,
-          }),
+        pb.collection('appointments').getFullList({
+          filter: `start_time >= "${startOfMonth}" && start_time <= "${endOfMonth}" && clinic_id = "${user.clinic_id}"`,
+        }),
+        pb.collection('consultations_finance').getFullList({
+          filter: `created >= "${startOfMonth}" && created <= "${endOfMonth}" && clinic_id = "${user.clinic_id}" && status != 'cancelled'`,
+        }),
+        pb.collection('medical_notes').getFullList({
+          filter: `created >= "${startOfMonth}" && created <= "${endOfMonth}" && clinic_id = "${user.clinic_id}"`,
+        }),
+        pb.collection('clinic_settings').getOne(user.clinic_id),
       ])
 
+      const config = clinic.bonus_config || { revenue_percentage: 0, performance_thresholds: [] }
+      setBonusConfig(config)
+
       const financeByProf = new Map<string, number>()
+      const paidFinanceByProf = new Map<string, number>()
+
       finance.forEach((f) => {
         let profId = f.medical_note_id
           ? notes.find((n) => n.id === f.medical_note_id)?.professionalId
@@ -61,7 +86,12 @@ export function ProfessionalRanking() {
           const appts = appointments.filter((a) => a.patient_id === f.patient_id)
           if (appts.length > 0) profId = appts[appts.length - 1].professional_id
         }
-        if (profId) financeByProf.set(profId, (financeByProf.get(profId) || 0) + f.amount)
+        if (profId) {
+          financeByProf.set(profId, (financeByProf.get(profId) || 0) + f.amount)
+          if (f.status === 'paid') {
+            paidFinanceByProf.set(profId, (paidFinanceByProf.get(profId) || 0) + f.amount)
+          }
+        }
       })
 
       const stats = professionals.map((prof) => {
@@ -73,6 +103,7 @@ export function ProfessionalRanking() {
           name: prof.name || 'Sem Nome',
           avatarUrl: prof.avatar ? pb.files.getUrl(prof, prof.avatar) : undefined,
           revenue: financeByProf.get(prof.id) || 0,
+          paidRevenue: paidFinanceByProf.get(prof.id) || 0,
           volume: completed,
           efficiency: total > 0 ? (completed / total) * 100 : 0,
           totalAppts: total,
@@ -82,16 +113,40 @@ export function ProfessionalRanking() {
       const maxRev = Math.max(...stats.map((s) => s.revenue), 1)
       const maxVol = Math.max(...stats.map((s) => s.volume), 1)
 
-      setData(
-        stats
-          .map((s) => {
-            const revScore = (s.revenue / maxRev) * 40
-            const volScore = (s.volume / maxVol) * 30
-            const effScore = (s.efficiency / 100) * 30
-            return { ...s, revScore, volScore, effScore, score: revScore + volScore + effScore }
-          })
-          .sort((a, b) => b.score - a.score),
-      )
+      const processedData = stats
+        .map((s) => {
+          const revScore = (s.revenue / maxRev) * 40
+          const volScore = (s.volume / maxVol) * 30
+          const effScore = (s.efficiency / 100) * 30
+          const score = revScore + volScore + effScore
+
+          const revenueShare = s.paidRevenue * (config.revenue_percentage / 100)
+
+          let multiplier = 1
+          const thresholds = [...(config.performance_thresholds || [])].sort(
+            (a, b) => b.min_score - a.min_score,
+          )
+          const matchedThreshold = thresholds.find((t: any) => score >= t.min_score)
+          if (matchedThreshold) {
+            multiplier = matchedThreshold.multiplier
+          }
+
+          const estimatedBonus = revenueShare * multiplier
+
+          return {
+            ...s,
+            revScore,
+            volScore,
+            effScore,
+            score,
+            revenueShare,
+            multiplier,
+            estimatedBonus,
+          }
+        })
+        .sort((a, b) => b.score - a.score)
+
+      setData(processedData)
     } catch (err) {
       console.error(err)
     } finally {
@@ -101,7 +156,8 @@ export function ProfessionalRanking() {
 
   useEffect(() => {
     loadData()
-  }, [user?.clinic_id])
+  }, [user?.clinic_id, period])
+
   useRealtime(
     'appointments',
     () => {
@@ -116,14 +172,13 @@ export function ProfessionalRanking() {
     },
     !!user?.clinic_id,
   )
-
-  if (loading) {
-    return (
-      <Card className="flex h-[300px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </Card>
-    )
-  }
+  useRealtime(
+    'clinic_settings',
+    () => {
+      loadData()
+    },
+    !!user?.clinic_id,
+  )
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Trophy className="h-5 w-5 text-[#FFD700]" />
@@ -136,30 +191,78 @@ export function ProfessionalRanking() {
     )
   }
 
+  const canViewBonus = (profId: string) => {
+    if (user?.role === 'admin' || user?.role === 'manager') return true
+    if (user?.role === 'professional' && user?.id === profId) return true
+    return false
+  }
+
+  const isConfigured = bonusConfig && bonusConfig.revenue_percentage > 0
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ranking de Profissionais</CardTitle>
-        <CardDescription>
-          Desempenho baseado em Receita (40%), Volume (30%) e Eficiência (30%) no mês atual.
-        </CardDescription>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <CardTitle>Ranking e Comissionamento</CardTitle>
+            <CardDescription>
+              Desempenho baseado em Receita (40%), Volume (30%) e Eficiência (30%).
+            </CardDescription>
+          </div>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Selecione o período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current_month">Mês Atual</SelectItem>
+              <SelectItem value="last_month">Mês Anterior</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {user?.role === 'admin' && !isConfigured && !loading && (
+          <Alert className="mt-4 border-primary/50 bg-primary/5">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <AlertTitle className="text-primary">Regras de bônus não configuradas</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Configure as regras de repasse para habilitar o cálculo automático de bônus.
+              </span>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/settings">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Configurar
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
+        {loading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : data.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             Nenhum profissional encontrado.
           </div>
         ) : (
-          <div className="rounded-md border overflow-hidden">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16 text-center">Rank</TableHead>
                   <TableHead>Profissional</TableHead>
-                  <TableHead className="text-right">Receita</TableHead>
+                  <TableHead className="text-right">Receita Total</TableHead>
                   <TableHead className="text-center">Volume</TableHead>
                   <TableHead className="text-center">Eficiência</TableHead>
                   <TableHead className="text-right">Pontuação</TableHead>
+                  {(user?.role === 'admin' ||
+                    user?.role === 'manager' ||
+                    user?.role === 'professional') && (
+                    <TableHead className="text-right whitespace-nowrap">Bônus Estimado</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,10 +277,10 @@ export function ProfessionalRanking() {
                           {item.avatarUrl && <AvatarImage src={item.avatarUrl} alt={item.name} />}
                           <AvatarFallback>{item.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{item.name}</span>
+                        <span className="font-medium whitespace-nowrap">{item.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       R$ {item.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-center">{item.volume}</TableCell>
@@ -205,6 +308,61 @@ export function ProfessionalRanking() {
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
+                    {(user?.role === 'admin' ||
+                      user?.role === 'manager' ||
+                      user?.role === 'professional') && (
+                      <TableCell className="text-right whitespace-nowrap">
+                        {canViewBonus(item.id) ? (
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help flex items-center justify-end gap-1 font-bold text-green-600 dark:text-green-400 w-full">
+                              R${' '}
+                              {item.estimatedBonus.toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                              })}
+                              <Info className="h-3 w-3" />
+                            </TooltipTrigger>
+                            <TooltipContent align="end" className="w-[260px]">
+                              <div className="space-y-2 text-sm">
+                                <p className="font-semibold border-b pb-1">Composição do Bônus</p>
+                                <p className="flex justify-between">
+                                  <span>Receita Paga:</span>
+                                  <span>
+                                    R${' '}
+                                    {item.paidRevenue.toLocaleString('pt-BR', {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                </p>
+                                <p className="flex justify-between">
+                                  <span>Repasse ({bonusConfig?.revenue_percentage || 0}%):</span>
+                                  <span>
+                                    R${' '}
+                                    {item.revenueShare.toLocaleString('pt-BR', {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                </p>
+                                <p className="flex justify-between">
+                                  <span>Multiplicador (Score {item.score.toFixed(0)}):</span>
+                                  <span>{item.multiplier}x</span>
+                                </p>
+                                <p className="flex justify-between font-bold pt-1 border-t">
+                                  <span>Total:</span>
+                                  <span>
+                                    R${' '}
+                                    {item.estimatedBonus.toLocaleString('pt-BR', {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-muted-foreground italic text-sm">Restrito</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
