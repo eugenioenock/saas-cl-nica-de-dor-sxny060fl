@@ -50,12 +50,10 @@ export default function FranchiseTransfers() {
   const loadData = async () => {
     try {
       const [tData, cData] = await Promise.all([
-        pb
-          .collection('unit_transfers')
-          .getFullList({
-            expand: 'source_clinic_id,target_clinic_id,requested_by,approved_by',
-            sort: '-created',
-          }),
+        pb.collection('unit_transfers').getFullList({
+          expand: 'source_clinic_id,target_clinic_id,requested_by,approved_by',
+          sort: '-created',
+        }),
         pb.collection('clinic_settings').getFullList(),
       ])
       setTransfers(tData)

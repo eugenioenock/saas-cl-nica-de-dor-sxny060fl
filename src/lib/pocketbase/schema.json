@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:30:50.906Z",
+  "generatedAt": "2026-04-19T17:35:45.008Z",
   "collections": [
     {
       "name": "users",
@@ -433,6 +433,12 @@
         {
           "name": "closing_time",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "revenue_alert_threshold",
+          "type": "number",
           "required": false,
           "system": false
         }
@@ -1499,6 +1505,60 @@
           "required": false,
           "system": false,
           "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "announcements",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (clinic_id = '' || clinic_id = @request.auth.clinic_id || @request.auth.role = 'admin')",
+        "view": "@request.auth.id != '' && (clinic_id = '' || clinic_id = @request.auth.clinic_id || @request.auth.role = 'admin')",
+        "create": "@request.auth.role = 'admin'",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["low", "medium", "high", "urgent"]
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clinic_settings"
         },
         {
           "name": "created",

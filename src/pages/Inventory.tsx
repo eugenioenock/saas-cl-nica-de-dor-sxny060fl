@@ -29,6 +29,9 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { ScannerDialog } from '@/components/ScannerDialog'
 import {
   Plus,
   Loader2,
@@ -37,6 +40,7 @@ import {
   AlertTriangle,
   History,
   PackagePlus,
+  ScanBarcode,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -44,15 +48,18 @@ import { useToast } from '@/hooks/use-toast'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
-import { Switch } from '@/components/ui/switch'
-import { ScannerDialog } from '@/components/ScannerDialog'
-import { ScanBarcode } from 'lucide-react'
+import { useAppContext } from '@/hooks/use-app-context'
 
 export default function Inventory() {
   const { toast } = useToast()
+  const { user } = useAuth()
+  const { activeClinic } = useAppContext()
+
   const [items, setItems] = useState<any[]>([])
   const [batches, setBatches] = useState<any[]>([])
+  const [suggestions, setSuggestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -73,14 +80,135 @@ export default function Inventory() {
   const [traceMaterial, setTraceMaterial] = useState<any>(null)
   const [traceLogs, setTraceLogs] = useState<any[]>([])
 
-  const { user } = useAuth()
-  const { activeClinic } = useAppContext()
+  const [formData, setFormData] = useState({
+    name: '',
+    min_quantity: '',
+    unit: 'un',
+    is_high_cost: false,
+    barcode: '',
+  })
+  const [scannerOpen, setScannerOpen] = useState(false)
+
+  const [countModalOpen, setCountModalOpen] = useState(false)
+  const [countForm, setCountForm] = useState({ material_id: '', actual_quantity: '' })
+
+  const loadData = async () => {
+    if (!activeClinic?.id) return
+    try {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const dateStr = thirtyDaysAgo.toISOString().replace('T', ' ').substring(0, 19)
+
+      const [records, batchRecords, usages] = await Promise.all([
+        pb
+          .collection('clinical_inventory')
+          .getFullList({ sort: 'name', filter: `clinic_id = "${activeClinic.id}"` }),
+        pb.collection('inventory_batches').getFullList({
+          sort: 'expiry_date',
+          filter: `current_quantity > 0 && clinic_id = "${activeClinic.id}"`,
+        }),
+        pb.collection('inventory_usage').getFullList({
+          filter: `usage_date >= "${dateStr}" && clinic_id = "${activeClinic.id}"`,
+          expand: 'batch_id',
+        }),
+      ])
+      setItems(records)
+      setBatches(batchRecords)
+
+      const usageMap: Record<string, number> = {}
+      usages.forEach((u) => {
+        const matId = u.expand?.batch_id?.material_id
+        if (matId) usageMap[matId] = (usageMap[matId] || 0) + u.quantity_used
+      })
+
+      const suggs = records
+        .map((item) => {
+          const used30 = usageMap[item.id] || 0
+          const avgDaily = used30 / 30
+          const needed = avgDaily * 15 - item.current_quantity
+          return {
+            ...item,
+            avgDaily,
+            suggestedQty: needed > 0 ? Math.ceil(needed) : 0,
+          }
+        })
+        .filter((s) => s.suggestedQty > 0)
+
+      setSuggestions(suggs)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [activeClinic?.id])
+  useRealtime('clinical_inventory', loadData)
+  useRealtime('inventory_batches', loadData)
+  useRealtime('inventory_usage', loadData)
+
+  const handleSaveMaterial = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setFieldErrors({})
+    try {
+      const payload = {
+        name: formData.name,
+        min_quantity: parseFloat(formData.min_quantity),
+        unit: formData.unit,
+        is_high_cost: formData.is_high_cost,
+        barcode: formData.barcode,
+        current_quantity: editingId ? undefined : 0,
+        clinic_id: activeClinic?.id,
+      }
+      if (editingId) {
+        await pb.collection('clinical_inventory').update(editingId, payload)
+        toast({ title: 'Material atualizado.' })
+      } else {
+        await pb.collection('clinical_inventory').create(payload)
+        toast({ title: 'Material adicionado.' })
+      }
+      setIsOpen(false)
+      setEditingId(null)
+      setFormData({ name: '', min_quantity: '', unit: 'un', is_high_cost: false, barcode: '' })
+    } catch (err) {
+      setFieldErrors(extractFieldErrors(err))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleSaveBatch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    try {
+      const qty = parseFloat(batchForm.initial_quantity)
+      await pb.collection('inventory_batches').create({
+        material_id: selectedMaterialId,
+        batch_number: batchForm.batch_number,
+        expiry_date: new Date(batchForm.expiry_date).toISOString(),
+        initial_quantity: qty,
+        current_quantity: qty,
+        supplier: batchForm.supplier,
+        cost_price: batchForm.cost_price ? parseFloat(batchForm.cost_price) : 0,
+        purchase_date: new Date().toISOString(),
+        clinic_id: activeClinic?.id,
+      })
+      toast({ title: 'Lote adicionado com sucesso.' })
+      setBatchModalOpen(false)
+    } catch (err) {
+      setFieldErrors(extractFieldErrors(err))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const handleSaveCount = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!countForm.material_id || !countForm.actual_quantity) return
     setIsSubmitting(true)
-
     try {
       const material = items.find((m) => m.id === countForm.material_id)
       const expected = material?.current_quantity || 0
@@ -97,14 +225,10 @@ export default function Inventory() {
       })
 
       if (discrepancy !== 0) {
-        await pb.collection('clinical_inventory').update(material.id, {
-          current_quantity: actual,
-        })
+        await pb.collection('clinical_inventory').update(material.id, { current_quantity: actual })
       }
-
       toast({ title: 'Contagem registrada com sucesso.' })
       setCountModalOpen(false)
-      setCountForm({ material_id: '', actual_quantity: '' })
     } catch (err) {
       toast({ title: 'Erro ao registrar contagem.', variant: 'destructive' })
     } finally {
@@ -112,118 +236,25 @@ export default function Inventory() {
     }
   }
 
-  const [formData, setFormData] = useState({
-    name: '',
-    min_quantity: '',
-    unit: 'un',
-    is_high_cost: false,
-    barcode: '',
-  })
-
-  const [scannerOpen, setScannerOpen] = useState(false)
-
-  const [countModalOpen, setCountModalOpen] = useState(false)
-  const [countForm, setCountForm] = useState({
-    material_id: '',
-    actual_quantity: '',
-  })
-
-  const loadData = async () => {
-    if (!activeClinic?.id) return
+  const handleCreateOrder = async (suggestion: any) => {
     try {
-      const [records, batchRecords] = await Promise.all([
-        pb
-          .collection('clinical_inventory')
-          .getFullList({ sort: 'name', filter: `clinic_id = "${activeClinic.id}"` }),
-        pb.collection('inventory_batches').getFullList({
-          sort: 'expiry_date',
-          filter: `current_quantity > 0 && clinic_id = "${activeClinic.id}"`,
-        }),
-      ])
-      setItems(records)
-      setBatches(batchRecords)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [activeClinic?.id])
-
-  useRealtime('clinical_inventory', loadData)
-  useRealtime('inventory_batches', loadData)
-  useRealtime('inventory_usage', loadData)
-
-  const handleSaveMaterial = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setFieldErrors({})
-
-    try {
-      const payload = {
-        name: formData.name,
-        min_quantity: parseFloat(formData.min_quantity),
-        unit: formData.unit,
-        is_high_cost: formData.is_high_cost,
-        barcode: formData.barcode,
-        current_quantity: editingId ? undefined : 0,
+      const order = await pb.collection('purchase_orders').create({
+        material_id: suggestion.id,
+        quantity: suggestion.suggestedQty,
+        status: 'draft',
         clinic_id: activeClinic?.id,
-      }
-
-      if (editingId) {
-        await pb.collection('clinical_inventory').update(editingId, payload)
-        toast({ title: 'Material atualizado.' })
-      } else {
-        await pb.collection('clinical_inventory').create(payload)
-        toast({ title: 'Material adicionado.' })
-      }
-
-      setIsOpen(false)
-      setEditingId(null)
-      setFormData({ name: '', min_quantity: '', unit: 'un', is_high_cost: false, barcode: '' })
-    } catch (err) {
-      setFieldErrors(extractFieldErrors(err))
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleSaveBatch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setFieldErrors({})
-
-    try {
-      const qty = parseFloat(batchForm.initial_quantity)
-      const payload = {
-        material_id: selectedMaterialId,
-        batch_number: batchForm.batch_number,
-        expiry_date: new Date(batchForm.expiry_date).toISOString(),
-        initial_quantity: qty,
-        current_quantity: qty,
-        supplier: batchForm.supplier,
-        cost_price: batchForm.cost_price ? parseFloat(batchForm.cost_price) : 0,
-        purchase_date: new Date().toISOString(),
-        clinic_id: activeClinic?.id,
-      }
-
-      await pb.collection('inventory_batches').create(payload)
-      toast({ title: 'Lote adicionado com sucesso.' })
-      setBatchModalOpen(false)
-      setBatchForm({
-        batch_number: '',
-        expiry_date: '',
-        initial_quantity: '',
-        supplier: '',
-        cost_price: '',
       })
-    } catch (err) {
-      setFieldErrors(extractFieldErrors(err))
-    } finally {
-      setIsSubmitting(false)
+
+      await pb.collection('action_logs').create({
+        action: 'auto_replenish_order',
+        collection_name: 'purchase_orders',
+        record_id: order.id,
+        details: { suggestedQty: suggestion.suggestedQty, avgDaily: suggestion.avgDaily },
+        clinic_id: activeClinic?.id,
+      })
+      toast({ title: 'Pedido de reposição (Rascunho) gerado com sucesso!' })
+    } catch (e) {
+      toast({ title: 'Erro ao gerar pedido', variant: 'destructive' })
     }
   }
 
@@ -267,14 +298,10 @@ export default function Inventory() {
     }
   }
 
-  const toggleRow = (id: string) => {
-    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
+  const toggleRow = (id: string) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }))
 
   const getBatchStatus = (expiryDate: string) => {
-    const exp = new Date(expiryDate)
-    const now = new Date()
-    const diffDays = (exp.getTime() - now.getTime()) / (1000 * 3600 * 24)
+    const diffDays = (new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24)
     if (diffDays < 0) return { label: 'Vencido', color: 'bg-red-100 text-red-800 border-red-200' }
     if (diffDays <= 30)
       return { label: 'Vence em breve', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
@@ -285,8 +312,10 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Estoque Avançado</h1>
-          <p className="text-muted-foreground">Gerencie materiais, lotes e rastreabilidade.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Estoque e Inteligência</h1>
+          <p className="text-muted-foreground">
+            Gerencie materiais e obtenha sugestões baseadas no consumo histórico.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -370,8 +399,7 @@ export default function Inventory() {
                 </div>
                 <DialogFooter>
                   <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Salvar
+                    {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Salvar
                   </Button>
                 </DialogFooter>
               </form>
@@ -380,194 +408,270 @@ export default function Inventory() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Materiais e Lotes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Estoque Total</TableHead>
-                  <TableHead>Estoque Mínimo</TableHead>
-                  <TableHead>Unidade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    </TableCell>
-                  </TableRow>
-                ) : items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      Nenhum material cadastrado.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  items.map((item) => {
-                    const isLow = item.current_quantity < item.min_quantity
-                    const isExpanded = expandedRows[item.id]
-                    const itemBatches = batches.filter((b) => b.material_id === item.id)
+      <Tabs defaultValue="inventory" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="inventory">Estoque e Lotes</TabsTrigger>
+          <TabsTrigger value="suggestions">
+            Sugestões de Reposição
+            {suggestions.length > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-primary text-primary-foreground">
+                {suggestions.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-                    return (
-                      <React.Fragment key={item.id}>
-                        <TableRow
-                          className={cn(
-                            'hover:bg-muted/50 transition-colors',
-                            isExpanded && 'bg-muted/30',
-                          )}
-                        >
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => toggleRow(item.id)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
+        <TabsContent value="inventory">
+          <Card>
+            <CardHeader>
+              <CardTitle>Materiais e Lotes Cadastrados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead>Material</TableHead>
+                      <TableHead>Estoque Total</TableHead>
+                      <TableHead>Estoque Mínimo</TableHead>
+                      <TableHead>Unidade</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                        </TableCell>
+                      </TableRow>
+                    ) : items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          Nenhum material cadastrado.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      items.map((item) => {
+                        const isLow = item.current_quantity < item.min_quantity
+                        const isExpanded = expandedRows[item.id]
+                        const itemBatches = batches.filter((b) => b.material_id === item.id)
+
+                        return (
+                          <React.Fragment key={item.id}>
+                            <TableRow
+                              className={cn(
+                                'hover:bg-muted/50 transition-colors',
+                                isExpanded && 'bg-muted/30',
                               )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {item.name}
-                            {item.is_high_cost && (
-                              <Badge
-                                variant="outline"
-                                className="ml-2 bg-purple-50 text-purple-700 border-purple-200"
-                              >
-                                Alto Custo
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-bold">{item.current_quantity}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.min_quantity}
-                          </TableCell>
-                          <TableCell className="uppercase">{item.unit}</TableCell>
-                          <TableCell>
-                            {isLow ? (
-                              <Badge
-                                variant="destructive"
-                                className="flex w-fit items-center gap-1"
-                              >
-                                <AlertTriangle className="h-3 w-3" /> Estoque Baixo
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="bg-green-50 text-green-700 border-green-200"
-                              >
-                                Regular
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openAddBatch(item)}
-                              >
-                                <PackagePlus className="h-4 w-4 mr-1" /> Add Lote
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => openTraceability(item)}
-                              >
-                                <History className="h-4 w-4 mr-1" /> Histórico
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditMaterial(item)}
-                              >
-                                Editar
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {isExpanded && (
-                          <TableRow className="bg-muted/10">
-                            <TableCell colSpan={7} className="p-0 border-b-0">
-                              <div className="p-4 pl-14">
-                                <h4 className="text-sm font-semibold mb-3">Lotes Ativos</h4>
-                                {itemBatches.length > 0 ? (
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow className="bg-transparent hover:bg-transparent">
-                                        <TableHead className="h-8">Lote</TableHead>
-                                        <TableHead className="h-8">Validade</TableHead>
-                                        <TableHead className="h-8">Qtd. Atual</TableHead>
-                                        <TableHead className="h-8">Fornecedor</TableHead>
-                                        <TableHead className="h-8">Status</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {itemBatches.map((b) => {
-                                        const status = getBatchStatus(b.expiry_date)
-                                        return (
-                                          <TableRow
-                                            key={b.id}
-                                            className="bg-transparent hover:bg-transparent"
-                                          >
-                                            <TableCell className="py-2 font-mono text-xs">
-                                              {b.batch_number}
-                                            </TableCell>
-                                            <TableCell className="py-2 text-sm">
-                                              {new Date(b.expiry_date).toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell className="py-2 text-sm font-medium">
-                                              {b.current_quantity}
-                                            </TableCell>
-                                            <TableCell className="py-2 text-sm">
-                                              {b.supplier || '-'}
-                                            </TableCell>
-                                            <TableCell className="py-2">
-                                              <Badge variant="outline" className={status.color}>
-                                                {status.label}
-                                              </Badge>
-                                            </TableCell>
-                                          </TableRow>
-                                        )
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                ) : (
-                                  <p className="text-sm text-muted-foreground">
-                                    Nenhum lote com estoque disponível.
-                                  </p>
+                            >
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => toggleRow(item.id)}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {item.name}
+                                {item.is_high_cost && (
+                                  <Badge
+                                    variant="outline"
+                                    className="ml-2 bg-purple-50 text-purple-700 border-purple-200"
+                                  >
+                                    Alto Custo
+                                  </Badge>
                                 )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                              </TableCell>
+                              <TableCell className="font-bold">{item.current_quantity}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {item.min_quantity}
+                              </TableCell>
+                              <TableCell className="uppercase">{item.unit}</TableCell>
+                              <TableCell>
+                                {isLow ? (
+                                  <Badge
+                                    variant="destructive"
+                                    className="flex w-fit items-center gap-1"
+                                  >
+                                    <AlertTriangle className="h-3 w-3" /> Estoque Baixo
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-green-50 text-green-700 border-green-200"
+                                  >
+                                    Regular
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openAddBatch(item)}
+                                  >
+                                    <PackagePlus className="h-4 w-4 mr-1" /> Add Lote
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => openTraceability(item)}
+                                  >
+                                    <History className="h-4 w-4 mr-1" /> Histórico
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openEditMaterial(item)}
+                                  >
+                                    Editar
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && (
+                              <TableRow className="bg-muted/10">
+                                <TableCell colSpan={7} className="p-0 border-b-0">
+                                  <div className="p-4 pl-14">
+                                    <h4 className="text-sm font-semibold mb-3">Lotes Ativos</h4>
+                                    {itemBatches.length > 0 ? (
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow className="bg-transparent hover:bg-transparent">
+                                            <TableHead className="h-8">Lote</TableHead>
+                                            <TableHead className="h-8">Validade</TableHead>
+                                            <TableHead className="h-8">Qtd. Atual</TableHead>
+                                            <TableHead className="h-8">Fornecedor</TableHead>
+                                            <TableHead className="h-8">Status</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {itemBatches.map((b) => {
+                                            const status = getBatchStatus(b.expiry_date)
+                                            return (
+                                              <TableRow
+                                                key={b.id}
+                                                className="bg-transparent hover:bg-transparent"
+                                              >
+                                                <TableCell className="py-2 font-mono text-xs">
+                                                  {b.batch_number}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-sm">
+                                                  {new Date(b.expiry_date).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-sm font-medium">
+                                                  {b.current_quantity}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-sm">
+                                                  {b.supplier || '-'}
+                                                </TableCell>
+                                                <TableCell className="py-2">
+                                                  <Badge variant="outline" className={status.color}>
+                                                    {status.label}
+                                                  </Badge>
+                                                </TableCell>
+                                              </TableRow>
+                                            )
+                                          })}
+                                        </TableBody>
+                                      </Table>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">
+                                        Nenhum lote com estoque disponível.
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="suggestions">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inteligência de Reposição</CardTitle>
+              <CardDescription>
+                Cálculo baseado no consumo médio diário dos últimos 30 dias (garante margem de 15
+                dias).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Estoque Atual</TableHead>
+                    <TableHead>Média Diária (30d)</TableHead>
+                    <TableHead className="text-primary font-bold">Sugestão (15 dias)</TableHead>
+                    <TableHead className="text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : suggestions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhuma reposição sugerida no momento. O estoque está saudável com base no
+                        histórico recente.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    suggestions.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell>
+                          {s.current_quantity} {s.unit}
+                        </TableCell>
+                        <TableCell>
+                          {s.avgDaily.toFixed(2)} {s.unit}/dia
+                        </TableCell>
+                        <TableCell className="font-bold text-primary">
+                          {s.suggestedQty} {s.unit}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" onClick={() => handleCreateOrder(s)}>
+                            <PackagePlus className="mr-2 h-4 w-4" /> Gerar Pedido
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={batchModalOpen} onOpenChange={setBatchModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar Novo Lote</DialogTitle>
-            <DialogDescription>Insira as informações do lote de entrada.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveBatch} className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -577,9 +681,6 @@ export default function Inventory() {
                 onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value })}
                 required
               />
-              {fieldErrors.batch_number && (
-                <span className="text-xs text-destructive">{fieldErrors.batch_number}</span>
-              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -603,28 +704,9 @@ export default function Inventory() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Fornecedor (Opcional)</Label>
-                <Input
-                  value={batchForm.supplier}
-                  onChange={(e) => setBatchForm({ ...batchForm, supplier: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Preço de Custo (Opcional)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={batchForm.cost_price}
-                  onChange={(e) => setBatchForm({ ...batchForm, cost_price: e.target.value })}
-                />
-              </div>
-            </div>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Salvar Lote
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Salvar Lote
               </Button>
             </DialogFooter>
           </form>
@@ -635,7 +717,6 @@ export default function Inventory() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Rastreabilidade: {traceMaterial?.name}</DialogTitle>
-            <DialogDescription>Histórico de uso deste material em pacientes.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[400px]">
             <Table>
@@ -652,7 +733,7 @@ export default function Inventory() {
                 {traceLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                      Nenhum registro de uso encontrado.
+                      Nenhum registro de uso.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -666,9 +747,7 @@ export default function Inventory() {
                       </TableCell>
                       <TableCell>{log.quantity_used}</TableCell>
                       <TableCell>{log.expand?.patient_id?.name}</TableCell>
-                      <TableCell>
-                        {log.expand?.professional_id?.name || log.expand?.professional_id?.email}
-                      </TableCell>
+                      <TableCell>{log.expand?.professional_id?.name}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -682,9 +761,6 @@ export default function Inventory() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Contagem Física de Estoque</DialogTitle>
-            <DialogDescription>
-              Ajuste o estoque do sistema de acordo com a contagem física real.
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveCount} className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -722,7 +798,6 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
             </div>
-
             {countForm.material_id && (
               <div className="grid grid-cols-2 gap-4 mt-2 p-3 bg-muted rounded-md">
                 <div>
@@ -746,11 +821,10 @@ export default function Inventory() {
                 </div>
               </div>
             )}
-
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting || !countForm.material_id}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Registrar e Ajustar
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Registrar e
+                Ajustar
               </Button>
             </DialogFooter>
           </form>
