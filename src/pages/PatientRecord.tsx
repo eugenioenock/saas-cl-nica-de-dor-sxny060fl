@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 import {
   ArrowLeft,
   Loader2,
@@ -85,6 +86,13 @@ const ANATOMY_REGIONS = [
 
 export default function PatientRecord() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const canEditPositions = ['admin', 'manager', 'professional'].includes(user?.role)
+  const [isAdjusting, setIsAdjusting] = useState(false)
+  const [draftPoints, setDraftPoints] = useState<any[]>([])
+  const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
   const [data, setData] = useState<any>({
     patient: null,
     points: [],
@@ -121,6 +129,36 @@ export default function PatientRecord() {
     notes: '',
   })
   const [isSubmittingUsage, setIsSubmittingUsage] = useState(false)
+
+  const toggleAdjustMode = () => {
+    if (isAdjusting) {
+      setIsAdjusting(false)
+      setDraftPoints([])
+      setDraggingPointId(null)
+    } else {
+      setIsAdjusting(true)
+      setDraftPoints(JSON.parse(JSON.stringify(data.points)))
+    }
+  }
+
+  const savePositions = async () => {
+    try {
+      const promises = draftPoints.map((pt) => {
+        const original = data.points.find((p: any) => p.id === pt.id)
+        if (original && (original.x !== pt.x || original.y !== pt.y)) {
+          return pb.collection('pain_points').update(pt.id, { x: pt.x, y: pt.y })
+        }
+        return Promise.resolve()
+      })
+      await Promise.all(promises)
+      toast.success('Posições atualizadas com sucesso!')
+      setIsAdjusting(false)
+      setDraftPoints([])
+      load()
+    } catch (e) {
+      toast.error('Erro ao salvar posições')
+    }
+  }
 
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 8) return 'bg-red-500 hover:bg-red-600 text-white'
@@ -360,53 +398,139 @@ export default function PatientRecord() {
             <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
                 <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
+                {canEditPositions && data.points.length > 0 && (
+                  <div className="flex gap-2">
+                    {isAdjusting ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={toggleAdjustMode}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" onClick={savePositions}>
+                          Salvar Posições
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={toggleAdjustMode}>
+                        Ajustar Marcadores
+                      </Button>
+                    )}
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="p-6 bg-slate-950 flex items-center justify-center">
-                <div className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)]">
+                <div
+                  ref={containerRef}
+                  className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none"
+                >
                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
                   <img
                     src={bodyImage}
                     alt="Anatomia Muscular (Costas)"
-                    className="w-full h-full object-cover pointer-events-none transition-opacity duration-500"
+                    className={cn(
+                      'w-full h-full object-cover pointer-events-none transition-opacity duration-500',
+                      isAdjusting && 'opacity-80 grayscale-[30%]',
+                    )}
                     onError={(e) => {
                       e.currentTarget.src =
                         'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
                     }}
                   />
 
-                  {ANATOMY_REGIONS.map((region) => {
-                    const pt = data.points.find((p: any) => p.name === region.name)
-                    const isActive = !!pt
+                  {!isAdjusting &&
+                    ANATOMY_REGIONS.map((region) => {
+                      const isActive = data.points.some((p: any) => p.name === region.name)
+                      if (isActive) return null
 
-                    const RegionGlow = (
-                      <div
-                        className={cn(
-                          'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
-                          isActive
-                            ? 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]'
-                            : 'hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50',
-                        )}
-                        style={{
-                          left: `${region.x}%`,
-                          top: `${region.y}%`,
-                          width: `${region.w}%`,
-                          height: `${region.h}%`,
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleRegionClick(region, pt)
-                        }}
-                      />
-                    )
+                      return (
+                        <div
+                          key={region.id}
+                          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
+                          style={{
+                            left: `${region.x}%`,
+                            top: `${region.y}%`,
+                            width: `${region.w}%`,
+                            height: `${region.h}%`,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRegionClick(region, null)
+                          }}
+                        />
+                      )
+                    })}
 
-                    if (!isActive)
-                      return <React.Fragment key={region.id}>{RegionGlow}</React.Fragment>
-
+                  {(isAdjusting ? draftPoints : data.points).map((pt: any) => {
+                    const region = ANATOMY_REGIONS.find((r) => r.name === pt.name)
+                    const w = region ? region.w : 10
+                    const h = region ? region.h : 10
                     const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
 
+                    const PointElement = (
+                      <div
+                        key={pt.id}
+                        onPointerDown={(e) => {
+                          if (!isAdjusting) return
+                          e.preventDefault()
+                          e.stopPropagation()
+                          e.currentTarget.setPointerCapture(e.pointerId)
+                          setDraggingPointId(pt.id)
+                        }}
+                        onPointerMove={(e) => {
+                          if (!isAdjusting || draggingPointId !== pt.id || !containerRef.current)
+                            return
+                          const rect = containerRef.current.getBoundingClientRect()
+                          let x = ((e.clientX - rect.left) / rect.width) * 100
+                          let y = ((e.clientY - rect.top) / rect.height) * 100
+                          x = Math.max(0, Math.min(100, x))
+                          y = Math.max(0, Math.min(100, y))
+                          setDraftPoints((prev) =>
+                            prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
+                          )
+                        }}
+                        onPointerUp={(e) => {
+                          if (!isAdjusting || draggingPointId !== pt.id) return
+                          e.currentTarget.releasePointerCapture(e.pointerId)
+                          setDraggingPointId(null)
+                        }}
+                        className={cn(
+                          'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
+                          isAdjusting
+                            ? 'cursor-grab active:cursor-grabbing z-30'
+                            : 'cursor-pointer z-20',
+                          isAdjusting && draggingPointId === pt.id
+                            ? 'bg-yellow-400/60 shadow-[0_0_20px_10px_rgba(250,204,21,0.6)] border-2 border-yellow-400 scale-110'
+                            : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
+                          isAdjusting &&
+                            draggingPointId &&
+                            draggingPointId !== pt.id &&
+                            'opacity-50',
+                        )}
+                        style={{
+                          left: `${pt.x}%`,
+                          top: `${pt.y}%`,
+                          width: `${w}%`,
+                          height: `${h}%`,
+                          touchAction: isAdjusting ? 'none' : 'auto',
+                        }}
+                        onClick={(e) => {
+                          if (isAdjusting) return
+                          e.stopPropagation()
+                          handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
+                        }}
+                      >
+                        {isAdjusting && draggingPointId === pt.id && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
+                            {Math.round(pt.x)}%, {Math.round(pt.y)}%
+                          </div>
+                        )}
+                      </div>
+                    )
+
+                    if (isAdjusting) return PointElement
+
                     return (
-                      <HoverCard key={region.id} openDelay={200} closeDelay={100}>
-                        <HoverCardTrigger asChild>{RegionGlow}</HoverCardTrigger>
+                      <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
+                        <HoverCardTrigger asChild>{PointElement}</HoverCardTrigger>
                         <HoverCardContent
                           className="w-72 z-50 glass-panel border-border/50 p-4"
                           align="center"
