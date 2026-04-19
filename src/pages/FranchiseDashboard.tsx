@@ -11,10 +11,15 @@ import {
   FileSpreadsheet,
   Printer,
   MapPin,
+  Info,
+  Medal,
+  Award,
+  Star,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Line,
@@ -85,7 +90,7 @@ export default function FranchiseDashboard() {
       const [clinicsRes, financesRes, appointmentsRes, patientsRes, usersRes] = await Promise.all([
         pb.collection('clinic_settings').getFullList(),
         pb.collection('consultations_finance').getFullList({
-          filter: `status = 'paid' && created >= '${oneYearAgo.toISOString()}'`,
+          filter: `(status = 'paid' || status = 'pending') && created >= '${oneYearAgo.toISOString()}'`,
         }),
         pb.collection('appointments').getFullList({
           filter: `start_time >= '${oneYearAgo.toISOString()}'`,
@@ -284,6 +289,96 @@ export default function FranchiseDashboard() {
 
     return { professionals, specialties }
   }, [currentAppts, filteredClinics, bounds, usersList])
+
+  const rankingStats = useMemo(() => {
+    if (!bounds || filteredClinics.length === 0) return []
+
+    const daysInPeriod = Math.max(
+      1,
+      Math.ceil((bounds.end.getTime() - bounds.start.getTime()) / 86400000),
+    )
+    const workDays = Math.ceil(daysInPeriod * (5 / 7))
+
+    const clinicData = filteredClinics.map((clinic) => {
+      const cFinances = currentFinances.filter(
+        (f) => f.clinic_id === clinic.id && (f.status === 'paid' || f.status === 'pending'),
+      )
+      const cAppts = currentAppts.filter((a) => a.clinic_id === clinic.id)
+
+      const revenue = cFinances.reduce((sum, f) => sum + f.amount, 0)
+      const volume = cAppts.length
+
+      const completedAppts = cAppts.filter((a) => a.status === 'completed').length
+      const completionRate = volume > 0 ? (completedAppts / volume) * 100 : 0
+
+      let totalApptHours = 0
+      const uniqueProfs = new Set()
+      cAppts.forEach((a) => {
+        if (a.professional_id) uniqueProfs.add(a.professional_id)
+        if (a.start_time && a.end_time) {
+          const start = new Date(a.start_time).getTime()
+          const end = new Date(a.end_time).getTime()
+          const hours = (end - start) / 3600000
+          if (hours > 0 && hours < 24) totalApptHours += hours
+        }
+      })
+
+      const getDailyHours = (start?: string, end?: string) => {
+        if (!start || !end) return 8
+        const [sh, sm] = start.split(':').map(Number)
+        const [eh, em] = end.split(':').map(Number)
+        return Math.max(1, eh + em / 60 - (sh + sm / 60))
+      }
+
+      const dailyHours = getDailyHours(clinic.opening_time, clinic.closing_time)
+      const profCount = Math.max(1, uniqueProfs.size)
+      const capacityHours = dailyHours * workDays * profCount
+      const occupancyRate = Math.min(
+        100,
+        capacityHours > 0 ? (totalApptHours / capacityHours) * 100 : 0,
+      )
+
+      const efficiencyScore = (completionRate + occupancyRate) / 2
+
+      return {
+        id: clinic.id,
+        name: clinic.name,
+        region: clinic.region,
+        state: clinic.state,
+        revenue,
+        volume,
+        completionRate,
+        occupancyRate,
+        efficiencyScore,
+      }
+    })
+
+    const maxRevenue = Math.max(...clinicData.map((c) => c.revenue), 1)
+    const maxVolume = Math.max(...clinicData.map((c) => c.volume), 1)
+
+    const scoredClinics = clinicData
+      .map((c) => {
+        const revenueScore = (c.revenue / maxRevenue) * 100
+        const volumeScore = (c.volume / maxVolume) * 100
+
+        const finalScore = revenueScore * 0.4 + volumeScore * 0.3 + c.efficiencyScore * 0.3
+
+        let tier = 'Bronze'
+        if (finalScore >= 80) tier = 'Gold'
+        else if (finalScore >= 60) tier = 'Silver'
+
+        return {
+          ...c,
+          revenueScore,
+          volumeScore,
+          finalScore,
+          tier,
+        }
+      })
+      .sort((a, b) => b.finalScore - a.finalScore)
+
+    return scoredClinics
+  }, [filteredClinics, currentFinances, currentAppts, bounds])
 
   const trendData = useMemo(() => {
     const months = []
@@ -730,6 +825,110 @@ export default function FranchiseDashboard() {
                     )}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>Ranking de Eficiência da Rede</CardTitle>
+              <CardDescription>
+                Classificação das unidades baseada em Receita (40%), Volume (30%) e Eficiência
+                (30%).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12 text-center">#</TableHead>
+                      <TableHead>Clínica</TableHead>
+                      <TableHead className="text-center">Score Final</TableHead>
+                      <TableHead className="text-center">Classificação</TableHead>
+                      <TableHead className="text-right">Métricas Principais</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rankingStats.map((clinic, index) => (
+                      <TableRow key={clinic.id}>
+                        <TableCell className="text-center font-bold text-muted-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{clinic.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {clinic.region || '-'} {clinic.state ? `/ ${clinic.state}` : ''}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="font-bold text-lg">
+                              {clinic.finalScore.toFixed(1)}
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                              </TooltipTrigger>
+                              <TooltipContent className="p-3 w-64 space-y-2">
+                                <div className="font-semibold text-sm mb-2">Composição da Nota</div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Receita (40%):</span>
+                                  <span>{clinic.revenueScore.toFixed(1)} / 100</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Volume (30%):</span>
+                                  <span>{clinic.volumeScore.toFixed(1)} / 100</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Eficiência (30%):</span>
+                                  <span>{clinic.efficiencyScore.toFixed(1)} / 100</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground pt-2 border-t mt-2">
+                                  Taxa de Conclusão: {clinic.completionRate.toFixed(1)}%<br />
+                                  Ocupação: {clinic.occupancyRate.toFixed(1)}%
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {clinic.tier === 'Gold' && (
+                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white w-24 justify-center">
+                              <Award className="w-3 h-3 mr-1" /> Alta
+                            </Badge>
+                          )}
+                          {clinic.tier === 'Silver' && (
+                            <Badge className="bg-slate-400 hover:bg-slate-500 text-white w-24 justify-center">
+                              <Medal className="w-3 h-3 mr-1" /> Média
+                            </Badge>
+                          )}
+                          {clinic.tier === 'Bronze' && (
+                            <Badge className="bg-amber-700 hover:bg-amber-800 text-white w-24 justify-center">
+                              <Star className="w-3 h-3 mr-1" /> Atenção
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-sm text-muted-foreground">
+                            {clinic.volume} atends. |{' '}
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }).format(clinic.revenue)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {rankingStats.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                          Nenhum dado para gerar ranking.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
