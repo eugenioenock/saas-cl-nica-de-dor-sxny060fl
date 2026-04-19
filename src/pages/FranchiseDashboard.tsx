@@ -135,9 +135,8 @@ export default function FranchiseDashboard() {
         if (pRev > 0) {
           variation = ((cRev - pRev) / pRev) * 100
           if (variation <= -20) dropWarning = true
-        } else if (cRev === 0 && pRev > 0) {
-          variation = -100
-          dropWarning = true
+        } else if (pRev === 0 && cRev > 0) {
+          variation = 100
         }
 
         return {
