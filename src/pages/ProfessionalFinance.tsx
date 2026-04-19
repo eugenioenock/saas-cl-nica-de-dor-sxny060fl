@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Trophy, Target, DollarSign, Award, Star, Loader2 } from 'lucide-react'
+import { Trophy, Target, DollarSign, Award, Star, Loader2, Activity } from 'lucide-react'
 import { BonusSimulator } from '@/components/dashboard/BonusSimulator'
 import { cn } from '@/lib/utils'
 
@@ -74,17 +74,15 @@ export default function ProfessionalFinance() {
         }
         if (profId) {
           financeByProf.set(profId, (financeByProf.get(profId) || 0) + f.amount)
-          if (f.status === 'paid') {
+          if (f.status === 'paid')
             paidFinanceByProf.set(profId, (paidFinanceByProf.get(profId) || 0) + f.amount)
-          }
         }
       })
 
       const profIds = Array.from(new Set(appointments.map((a) => a.professional_id)))
 
-      let maxRev = 1
-      let maxVol = 1
-
+      let maxRev = 1,
+        maxVol = 1
       const allStats = profIds.map((id) => {
         const profAppts = appointments.filter((a) => a.professional_id === id)
         const completed = profAppts.filter((a) => a.status === 'completed').length
@@ -96,7 +94,6 @@ export default function ProfessionalFinance() {
         maxRev = Math.max(...allStats.map((s) => s.rev), 1)
         maxVol = Math.max(...allStats.map((s) => s.vol), 1)
       }
-
       setMaxValues({ rev: maxRev, vol: maxVol })
 
       const myAppts = appointments.filter((a) => a.professional_id === user.id)
@@ -118,9 +115,7 @@ export default function ProfessionalFinance() {
         (a, b) => b.min_score - a.min_score,
       )
       const matchedThreshold = thresholds.find((t: any) => score >= t.min_score)
-      if (matchedThreshold) {
-        multiplier = matchedThreshold.multiplier
-      }
+      if (matchedThreshold) multiplier = matchedThreshold.multiplier
 
       const estimatedBonus = revenueShare * multiplier
       const nextThreshold = [...thresholds].reverse().find((t) => t.min_score > score)
@@ -136,6 +131,9 @@ export default function ProfessionalFinance() {
         estimatedBonus,
         nextThreshold,
         thresholds,
+        revScore,
+        volScore,
+        effScore,
       })
     } catch (err) {
       console.error(err)
@@ -147,13 +145,12 @@ export default function ProfessionalFinance() {
   useEffect(() => {
     loadData()
   }, [user?.clinic_id, period])
-
   useRealtime('appointments', () => loadData(), !!user?.clinic_id)
   useRealtime('consultations_finance', () => loadData(), !!user?.clinic_id)
 
   if (loading && !stats) {
     return (
-      <div className="flex h-64 items-center justify-center">
+      <div className="flex h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -162,20 +159,21 @@ export default function ProfessionalFinance() {
   const progressToNext = stats?.nextThreshold
     ? (stats.score / stats.nextThreshold.min_score) * 100
     : 100
-
   const isTopPerformer =
     stats?.multiplier > 1 &&
     stats?.multiplier === Math.max(...(stats?.thresholds.map((t: any) => t.multiplier) || [1]))
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 md:space-y-6 pb-20 md:pb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-background z-10 sticky top-16 md:static py-2 md:py-0 border-b md:border-0 -mx-4 px-4 md:mx-0 md:px-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Meu Financeiro</h1>
-          <p className="text-muted-foreground">Acompanhe sua performance e projeção de bônus.</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Meu Financeiro</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Acompanhe sua performance e projeção de bônus.
+          </p>
         </div>
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px] h-10 md:h-9 bg-card">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
           <SelectContent>
@@ -185,111 +183,155 @@ export default function ProfessionalFinance() {
         </Select>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-3">
         <Card
-          className={cn(isTopPerformer && 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/10')}
+          className={cn(
+            'shadow-sm',
+            isTopPerformer && 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/10',
+          )}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Mensal (Paga)</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 md:px-6 pt-4 md:pt-6">
+            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+              Receita (Paga)
+            </CardTitle>
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+              <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
+          <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
+            <div className="text-2xl md:text-3xl font-bold text-emerald-600 dark:text-emerald-500">
               R$ {stats?.paidRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total gerado: R${' '}
-              {stats?.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <p className="text-xs text-muted-foreground mt-1 border-t pt-2 mt-2">
+              Gerado:{' '}
+              <span className="font-medium">
+                R$ {stats?.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Score de Performance</CardTitle>
-            <Target className="h-4 w-4 text-blue-500" />
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 md:px-6 pt-4 md:pt-6">
+            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+              Score de Performance
+            </CardTitle>
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+              <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+          <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
+            <div className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-500 flex items-baseline gap-1">
               {stats?.score.toFixed(1)}{' '}
               <span className="text-sm font-normal text-muted-foreground">/ 100</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats?.volume} atendimentos ({stats?.efficiency.toFixed(1)}% efic.)
+            <p className="text-xs text-muted-foreground mt-1 border-t pt-2 mt-2 flex justify-between">
+              <span>Vol: {stats?.volume} atends.</span>
+              <span>Efic: {stats?.efficiency.toFixed(1)}%</span>
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bônus Estimado</CardTitle>
-            <Award className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              R$ {stats?.estimatedBonus.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        <Card className="bg-primary/5 border-primary/20 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-24 h-24 bg-primary/10 rounded-bl-full -z-0 translate-x-4 -translate-y-4"></div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 md:px-6 pt-4 md:pt-6 relative z-10">
+            <CardTitle className="text-sm font-bold uppercase text-primary">
+              Bônus Estimado
+            </CardTitle>
+            <div className="p-2 bg-primary/20 rounded-full">
+              <Award className="h-4 w-4 text-primary" />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Multiplicador atual: {stats?.multiplier}x
+          </CardHeader>
+          <CardContent className="px-4 md:px-6 pb-4 md:pb-6 relative z-10">
+            <div className="text-3xl md:text-4xl font-black text-primary tracking-tight">
+              R$ {stats?.estimatedBonus.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+            </div>
+            <p className="text-xs text-primary/80 font-medium mt-1 pt-2 mt-2">
+              Múltiplo Atual:{' '}
+              <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-1">
+                {stats?.multiplier}x
+              </span>
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
-              Gamificação e Metas
+      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+        <Card className="shadow-sm order-2 md:order-1">
+          <CardHeader className="px-4 py-4 md:p-6 border-b md:border-0 bg-muted/10 md:bg-transparent">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Trophy className="h-5 w-5 text-amber-500" /> Metas de Crescimento
             </CardTitle>
-            <CardDescription>Veja o quão perto você está do próximo multiplicador.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="p-4 md:p-6 space-y-6">
             {isTopPerformer ? (
-              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900">
-                <Star className="h-12 w-12 text-amber-400 fill-amber-400" />
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gradient-to-b from-amber-50 to-transparent dark:from-amber-950/20 dark:to-transparent rounded-xl border border-amber-200/50 dark:border-amber-900/50">
+                <div className="bg-amber-100 dark:bg-amber-900/40 p-3 rounded-full mb-2">
+                  <Star className="h-10 w-10 text-amber-500 fill-amber-500 animate-pulse" />
+                </div>
                 <div>
-                  <h3 className="font-bold text-lg text-amber-700 dark:text-amber-500">
-                    Top Performer!
+                  <h3 className="font-black text-xl text-amber-700 dark:text-amber-500">
+                    Nível Máximo Atingido!
                   </h3>
-                  <p className="text-sm text-amber-600/80 dark:text-amber-400/80">
-                    Você atingiu o multiplicador máximo deste mês.
+                  <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1 max-w-[250px] mx-auto">
+                    Excelente trabalho. Você está maximizando seus retornos operacionais este mês.
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-medium text-muted-foreground">
-                    Progresso para {stats?.nextThreshold?.multiplier}x
-                  </span>
-                  <span className="font-bold">
-                    {stats?.score.toFixed(1)} / {stats?.nextThreshold?.min_score} pts
-                  </span>
+              <div className="space-y-3 bg-card p-4 rounded-xl border shadow-sm">
+                <div className="flex justify-between text-sm items-end mb-2">
+                  <div>
+                    <span className="font-semibold text-foreground flex items-center gap-1">
+                      <Target className="h-3.5 w-3.5 text-primary" /> Próximo Nível:{' '}
+                      {stats?.nextThreshold?.multiplier}x
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-lg">{stats?.score.toFixed(1)}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {' '}
+                      / {stats?.nextThreshold?.min_score} pts
+                    </span>
+                  </div>
                 </div>
                 <Progress value={progressToNext} className="h-3" />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Aumente seu volume de consultas ou eficiência para atingir a próxima meta.
+                <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5 leading-relaxed">
+                  <Activity className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-500" />
+                  Conclua mais consultas sem cancelamentos para aumentar sua Eficiência e Volume.
                 </p>
               </div>
             )}
 
-            <div className="pt-4 border-t">
-              <h4 className="text-sm font-semibold mb-3">Tabela de Multiplicadores</h4>
-              <div className="space-y-2">
+            <div className="pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">
+                Tabela de Múltiplos
+              </h4>
+              <div className="space-y-1.5">
                 {stats?.thresholds.map((t: any, i: number) => (
                   <div
                     key={i}
                     className={cn(
-                      'flex justify-between items-center p-2 rounded text-sm',
+                      'flex justify-between items-center px-4 py-3 rounded-lg text-sm transition-colors border',
                       stats?.multiplier === t.multiplier
-                        ? 'bg-primary/10 font-medium text-primary'
-                        : 'text-muted-foreground',
+                        ? 'bg-primary/10 border-primary/20 font-bold text-primary shadow-sm ring-1 ring-primary/10'
+                        : 'bg-muted/10 border-transparent text-muted-foreground hover:bg-muted/30',
                     )}
                   >
-                    <span>Score {t.min_score}+</span>
-                    <span>{t.multiplier}x</span>
+                    <span className="flex items-center gap-2">
+                      {stats?.multiplier === t.multiplier && <CheckCheck className="h-4 w-4" />}
+                      Score {t.min_score}+
+                    </span>
+                    <span
+                      className={cn(
+                        'text-base',
+                        stats?.multiplier === t.multiplier
+                          ? 'bg-primary text-primary-foreground px-2 py-0.5 rounded-md'
+                          : '',
+                      )}
+                    >
+                      {t.multiplier}x
+                    </span>
                   </div>
                 ))}
               </div>
@@ -297,7 +339,9 @@ export default function ProfessionalFinance() {
           </CardContent>
         </Card>
 
-        <BonusSimulator bonusConfig={bonusConfig} maxRev={maxValues.rev} maxVol={maxValues.vol} />
+        <div className="order-1 md:order-2">
+          <BonusSimulator bonusConfig={bonusConfig} maxRev={maxValues.rev} maxVol={maxValues.vol} />
+        </div>
       </div>
     </div>
   )
