@@ -53,7 +53,7 @@ const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolea
   {
     title: 'Franquia - Dashboard',
     icon: BarChart3,
-    url: '/admin/franchise/dashboard',
+    url: '/franchise-dashboard',
     adminOnly: true,
   },
   {

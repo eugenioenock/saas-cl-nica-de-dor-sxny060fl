@@ -94,7 +94,11 @@ const App = () => (
                 element={<SettingsMaintenanceMigration />}
               />
               <Route path="/admin/franchise" element={<FranchiseManagement />} />
-              <Route path="/admin/franchise/dashboard" element={<FranchiseDashboard />} />
+              <Route path="/franchise-dashboard" element={<FranchiseDashboard />} />
+              <Route
+                path="/admin/franchise/dashboard"
+                element={<Navigate to="/franchise-dashboard" replace />}
+              />
               <Route path="/admin/franchise/templates" element={<FranchiseTemplates />} />
               <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
             </Route>
