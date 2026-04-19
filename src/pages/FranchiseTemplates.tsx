@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
-import { FileText, Plus, Pencil, Trash2 } from 'lucide-react'
+import { FileText, Plus, Pencil, Trash2, X } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -31,36 +31,50 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function FranchiseTemplates() {
   const { user } = useAuth()
   const [templates, setTemplates] = useState<any[]>([])
+  const [inventory, setInventory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'general_settings',
+    type: 'consultation_pattern',
     config_data: '{}',
   })
 
-  const loadTemplates = async () => {
+  const [protocolData, setProtocolData] = useState({
+    note_template: '',
+    required_materials: [] as { material_id: string; quantity: number }[],
+    financial_impact: { amount: 0, billing_type: 'private' },
+  })
+
+  const loadData = async () => {
     try {
-      const data = await pb.collection('clinic_templates').getFullList()
+      const [data, inv] = await Promise.all([
+        pb.collection('clinic_templates').getFullList(),
+        pb.collection('clinical_inventory').getFullList({ sort: 'name' }),
+      ])
       setTemplates(data)
+      setInventory(inv)
     } catch (e) {
-      toast.error('Erro ao carregar templates')
+      toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadTemplates()
+    loadData()
   }, [])
 
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+  if (user?.role !== 'admin' && user?.role !== 'manager') {
+    return <Navigate to="/dashboard" replace />
+  }
 
   const openDialog = (t?: any) => {
     if (t) {
@@ -70,12 +84,28 @@ export default function FranchiseTemplates() {
         type: t.type,
         config_data: JSON.stringify(t.config_data, null, 2),
       })
+      if (t.type === 'consultation_pattern') {
+        const conf = t.config_data || {}
+        setProtocolData({
+          note_template: conf.note_template || '',
+          required_materials: conf.required_materials || [],
+          financial_impact: {
+            amount: conf.financial_impact?.amount || 0,
+            billing_type: conf.financial_impact?.billing_type || 'private',
+          },
+        })
+      }
     } else {
       setEditingId(null)
       setFormData({
         name: '',
-        type: 'general_settings',
-        config_data: '{\n  "opening_time": "08:00",\n  "closing_time": "18:00"\n}',
+        type: 'consultation_pattern',
+        config_data: '{}',
+      })
+      setProtocolData({
+        note_template: '',
+        required_materials: [],
+        financial_impact: { amount: 0, billing_type: 'private' },
       })
     }
     setDialogOpen(true)
@@ -83,18 +113,22 @@ export default function FranchiseTemplates() {
 
   const handleSave = async () => {
     try {
-      let parsedConfig = {}
-      try {
-        parsedConfig = JSON.parse(formData.config_data)
-      } catch (e) {
-        toast.error('Formato JSON inválido')
-        return
+      let finalConfig = {}
+      if (formData.type === 'consultation_pattern') {
+        finalConfig = protocolData
+      } else {
+        try {
+          finalConfig = JSON.parse(formData.config_data)
+        } catch (e) {
+          toast.error('Formato JSON inválido')
+          return
+        }
       }
 
       const data = {
         name: formData.name,
         type: formData.type,
-        config_data: parsedConfig,
+        config_data: finalConfig,
       }
 
       if (editingId) {
@@ -105,7 +139,7 @@ export default function FranchiseTemplates() {
         toast.success('Template criado')
       }
       setDialogOpen(false)
-      loadTemplates()
+      loadData()
     } catch (e) {
       toast.error('Erro ao salvar template')
     }
@@ -115,7 +149,25 @@ export default function FranchiseTemplates() {
     if (!window.confirm('Deseja realmente excluir este template?')) return
     await pb.collection('clinic_templates').delete(id)
     toast.success('Template excluído')
-    loadTemplates()
+    loadData()
+  }
+
+  const addMaterial = () => {
+    setProtocolData({
+      ...protocolData,
+      required_materials: [...protocolData.required_materials, { material_id: '', quantity: 1 }],
+    })
+  }
+
+  const updateMaterial = (index: number, field: string, value: any) => {
+    const newMats = [...protocolData.required_materials]
+    newMats[index] = { ...newMats[index], [field]: value }
+    setProtocolData({ ...protocolData, required_materials: newMats })
+  }
+
+  const removeMaterial = (index: number) => {
+    const newMats = protocolData.required_materials.filter((_, i) => i !== index)
+    setProtocolData({ ...protocolData, required_materials: newMats })
   }
 
   return (
@@ -124,10 +176,10 @@ export default function FranchiseTemplates() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <FileText className="h-8 w-8 text-primary" />
-            Templates de Unidade
+            Templates & Protocolos
           </h1>
           <p className="text-muted-foreground">
-            Padrões de configuração para novas clínicas da rede.
+            Gerencie padrões de consulta, protocolos clínicos e configurações.
           </p>
         </div>
         <Button onClick={() => openDialog()}>
@@ -164,9 +216,9 @@ export default function FranchiseTemplates() {
                     <TableCell className="font-medium">{t.name}</TableCell>
                     <TableCell>
                       {t.type === 'general_settings'
-                        ? 'Config. Gerais'
+                        ? 'Configurações Gerais'
                         : t.type === 'consultation_pattern'
-                          ? 'Padrão de Consulta'
+                          ? 'Protocolo Clínico (SOP)'
                           : 'Menu de Estoque'}
                     </TableCell>
                     <TableCell className="text-right">
@@ -186,44 +238,161 @@ export default function FranchiseTemplates() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Template' : 'Novo Template'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome do Template</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome do Template</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(v) => setFormData({ ...formData, type: v })}
+                    disabled={!!editingId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consultation_pattern">Protocolo Clínico (SOP)</SelectItem>
+                      <SelectItem value="general_settings">Configurações Gerais</SelectItem>
+                      <SelectItem value="inventory_menu">Menu de Estoque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.type === 'consultation_pattern' ? (
+                <div className="space-y-6 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label>Template do Prontuário</Label>
+                    <Textarea
+                      placeholder="Estrutura do texto que será inserido no prontuário..."
+                      className="min-h-[120px]"
+                      value={protocolData.note_template}
+                      onChange={(e) =>
+                        setProtocolData({ ...protocolData, note_template: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label>Materiais Obrigatórios (Estoque)</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addMaterial}>
+                        <Plus className="h-4 w-4 mr-2" /> Adicionar Material
+                      </Button>
+                    </div>
+                    {protocolData.required_materials.map((mat, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Select
+                          value={mat.material_id}
+                          onValueChange={(v) => updateMaterial(index, 'material_id', v)}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Selecione o material" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {inventory.map((i) => (
+                              <SelectItem key={i.id} value={i.id}>
+                                {i.name} ({i.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          placeholder="Qtd"
+                          className="w-24"
+                          value={mat.quantity || ''}
+                          onChange={(e) =>
+                            updateMaterial(index, 'quantity', Number(e.target.value))
+                          }
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeMaterial(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    {protocolData.required_materials.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-2 bg-slate-50 rounded border border-dashed">
+                        Nenhum material vinculado a este protocolo.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <Label>Impacto Financeiro (Cobrança Automática)</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <span className="text-xs text-muted-foreground">Valor Padrão (R$)</span>
+                        <Input
+                          type="number"
+                          value={protocolData.financial_impact.amount}
+                          onChange={(e) =>
+                            setProtocolData({
+                              ...protocolData,
+                              financial_impact: {
+                                ...protocolData.financial_impact,
+                                amount: Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs text-muted-foreground">Tipo Faturamento</span>
+                        <Select
+                          value={protocolData.financial_impact.billing_type}
+                          onValueChange={(v) =>
+                            setProtocolData({
+                              ...protocolData,
+                              financial_impact: {
+                                ...protocolData.financial_impact,
+                                billing_type: v,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="private">Particular</SelectItem>
+                            <SelectItem value="insurance">Convênio</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 pt-4 border-t">
+                  <Label>Configuração (Objeto JSON)</Label>
+                  <Textarea
+                    rows={12}
+                    className="font-mono text-sm"
+                    value={formData.config_data}
+                    onChange={(e) => setFormData({ ...formData, config_data: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(v) => setFormData({ ...formData, type: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="general_settings">Configurações Gerais</SelectItem>
-                  <SelectItem value="consultation_pattern">Padrão de Consulta</SelectItem>
-                  <SelectItem value="inventory_menu">Menu de Estoque</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Configuração (Objeto JSON)</Label>
-              <Textarea
-                rows={8}
-                className="font-mono text-sm"
-                value={formData.config_data}
-                onChange={(e) => setFormData({ ...formData, config_data: e.target.value })}
-              />
-            </div>
-          </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancelar

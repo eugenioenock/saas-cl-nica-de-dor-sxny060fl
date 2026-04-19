@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ProcedureModal } from '@/components/medical/procedure-modal'
+import { ProtocolModal } from '@/components/medical/protocol-modal'
 import { toast } from 'sonner'
 import { Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -413,7 +414,10 @@ export default function PatientRecord() {
             <Card>
               <CardHeader className="flex flex-row justify-between items-center">
                 <CardTitle>Registros Clínicos</CardTitle>
-                <ProcedureModal patientId={id!} onAdd={load} />
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <ProtocolModal patientId={id!} onSuccess={load} />
+                  <ProcedureModal patientId={id!} onAdd={load} />
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {data.notes.map((n: any) => (
