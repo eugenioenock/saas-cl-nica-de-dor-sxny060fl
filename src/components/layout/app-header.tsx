@@ -78,26 +78,32 @@ export function AppHeader() {
           <Building2 className="h-4 w-4 text-primary" />
           <span className="text-muted-foreground">{activeFranchise.name}</span>
           <span className="text-muted-foreground">/</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 px-2 font-semibold">
-                {activeClinic?.name || 'Carregando...'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Select Clinic</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {clinics.map((clinic) => (
-                <DropdownMenuItem
-                  key={clinic.id}
-                  onClick={() => setActiveClinic(clinic.id)}
-                  className={clinic.id === activeClinic?.id ? 'bg-accent' : ''}
-                >
-                  {clinic.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {clinics.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 px-2 font-semibold">
+                  {activeClinic?.name || 'Carregando...'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Selecionar Unidade</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {clinics.map((clinic) => (
+                  <DropdownMenuItem
+                    key={clinic.id}
+                    onClick={() => setActiveClinic(clinic.id)}
+                    className={clinic.id === activeClinic?.id ? 'bg-accent' : ''}
+                  >
+                    {clinic.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className="h-8 flex items-center px-2 font-semibold">
+              {activeClinic?.name || 'Carregando...'}
+            </span>
+          )}
         </div>
 
         <div className="flex w-full max-w-sm items-center gap-2 md:ml-auto">

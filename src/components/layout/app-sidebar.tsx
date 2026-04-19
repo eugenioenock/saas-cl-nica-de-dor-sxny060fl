@@ -47,6 +47,7 @@ const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/po
 
 const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
+  { title: 'Franquia', icon: Building2, url: '/admin/franchise', adminOnly: true },
   { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
   { title: 'Auditoria', icon: Activity, url: '/settings/audit-history', adminOnly: true },
 ]

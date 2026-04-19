@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useRealtime } from '@/hooks/use-realtime'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -75,6 +76,10 @@ export default function SettingsAccessControl() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useRealtime('users', loadData)
+  useRealtime('clinic_settings', loadData)
+  useRealtime('user_clinic_access', loadData)
 
   const activeUsers = useMemo(() => {
     const list = users.filter((u) => u.status === 'active')

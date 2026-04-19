@@ -29,6 +29,7 @@ import MatrixDashboard from './pages/MatrixDashboard'
 import PendingApproval from './pages/PendingApproval'
 import UnitsComparison from './pages/UnitsComparison'
 import AuditHistory from './pages/AuditHistory'
+import FranchiseManagement from './pages/FranchiseManagement'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -89,6 +90,7 @@ const App = () => (
                 path="/settings/maintenance/migration"
                 element={<SettingsMaintenanceMigration />}
               />
+              <Route path="/admin/franchise" element={<FranchiseManagement />} />
             </Route>
             <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="*" element={<NotFound />} />
