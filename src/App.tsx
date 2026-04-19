@@ -22,9 +22,11 @@ import QuickUsage from './pages/QuickUsage'
 import ReportsPerformance from './pages/ReportsPerformance'
 import Integrations from './pages/Integrations'
 import SettingsAccessControl from './pages/SettingsAccessControl'
+import SettingsReports from './pages/SettingsReports'
 import SettingsMaintenance from './pages/SettingsMaintenance'
 import SettingsMaintenanceMigration from './pages/SettingsMaintenanceMigration'
 import MatrixDashboard from './pages/MatrixDashboard'
+import PendingApproval from './pages/PendingApproval'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -32,6 +34,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth()
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
+  if (user.status === 'pending' || user.status === 'rejected')
+    return <Navigate to="/pending-approval" replace />
   return <>{children}</>
 }
 
@@ -75,12 +79,14 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/integrations" element={<Integrations />} />
               <Route path="/settings/access-control" element={<SettingsAccessControl />} />
+              <Route path="/settings/reports" element={<SettingsReports />} />
               <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
               <Route
                 path="/settings/maintenance/migration"
                 element={<SettingsMaintenanceMigration />}
               />
             </Route>
+            <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>
