@@ -1,9 +1,21 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
-import { BarChart3, DollarSign, Activity, AlertTriangle, Users, TrendingUp } from 'lucide-react'
+import {
+  BarChart3,
+  DollarSign,
+  Activity,
+  AlertTriangle,
+  Users,
+  TrendingUp,
+  Download,
+  FileSpreadsheet,
+  Printer,
+  MapPin,
+} from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Line,
   LineChart,
@@ -16,6 +28,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  BarChart,
+  Bar,
 } from 'recharts'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +40,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -50,16 +70,19 @@ export default function FranchiseDashboard() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState<'30d' | 'month' | 'quarter'>('month')
+  const [selectedRegion, setSelectedRegion] = useState<string>('all')
+  const [selectedState, setSelectedState] = useState<string>('all')
 
   const [clinics, setClinics] = useState<any[]>([])
   const [finances, setFinances] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
-  const [totalPatients, setTotalPatients] = useState(0)
+  const [patientsCount, setPatientsCount] = useState(0)
+  const [usersList, setUsersList] = useState<any[]>([])
 
   const loadData = async () => {
     try {
       const oneYearAgo = subMonths(new Date(), 12)
-      const [clinicsRes, financesRes, appointmentsRes, patientsRes] = await Promise.all([
+      const [clinicsRes, financesRes, appointmentsRes, patientsRes, usersRes] = await Promise.all([
         pb.collection('clinic_settings').getFullList(),
         pb.collection('consultations_finance').getFullList({
           filter: `status = 'paid' && created >= '${oneYearAgo.toISOString()}'`,
@@ -68,11 +91,13 @@ export default function FranchiseDashboard() {
           filter: `start_time >= '${oneYearAgo.toISOString()}'`,
         }),
         pb.collection('patients').getList(1, 1),
+        pb.collection('users').getFullList(),
       ])
       setClinics(clinicsRes)
       setFinances(financesRes)
       setAppointments(appointmentsRes)
-      setTotalPatients(patientsRes.totalItems)
+      setPatientsCount(patientsRes.totalItems)
+      setUsersList(usersRes)
     } catch (err) {
       console.error(err)
     } finally {
@@ -83,6 +108,44 @@ export default function FranchiseDashboard() {
   useEffect(() => {
     loadData()
   }, [])
+
+  const availableRegions = useMemo(
+    () => Array.from(new Set(clinics.map((c) => c.region).filter(Boolean))).sort(),
+    [clinics],
+  )
+
+  const availableStates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          clinics
+            .filter((c) => selectedRegion === 'all' || c.region === selectedRegion)
+            .map((c) => c.state)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [clinics, selectedRegion],
+  )
+
+  useEffect(() => {
+    if (
+      selectedRegion !== 'all' &&
+      selectedState !== 'all' &&
+      !availableStates.includes(selectedState)
+    ) {
+      setSelectedState('all')
+    }
+  }, [selectedRegion, availableStates, selectedState])
+
+  const filteredClinics = useMemo(
+    () =>
+      clinics.filter(
+        (c) =>
+          (selectedRegion === 'all' || c.region === selectedRegion) &&
+          (selectedState === 'all' || c.state === selectedState),
+      ),
+    [clinics, selectedRegion, selectedState],
+  )
 
   const bounds = useMemo(() => {
     const n = new Date()
@@ -108,20 +171,28 @@ export default function FranchiseDashboard() {
 
   const { currentFinances, prevFinances, currentAppts } = useMemo(() => {
     if (!bounds) return { currentFinances: [], prevFinances: [], currentAppts: [] }
-    const currF = finances.filter((f) => isWithinInterval(new Date(f.created), bounds))
-    const prevF = finances.filter((f) =>
-      isWithinInterval(new Date(f.created), { start: bounds.prevStart, end: bounds.prevEnd }),
+    const clinicIds = new Set(filteredClinics.map((c) => c.id))
+
+    const currF = finances.filter(
+      (f) => clinicIds.has(f.clinic_id) && isWithinInterval(new Date(f.created), bounds),
     )
-    const currA = appointments.filter((a) => isWithinInterval(new Date(a.start_time), bounds))
+    const prevF = finances.filter(
+      (f) =>
+        clinicIds.has(f.clinic_id) &&
+        isWithinInterval(new Date(f.created), { start: bounds.prevStart, end: bounds.prevEnd }),
+    )
+    const currA = appointments.filter(
+      (a) => clinicIds.has(a.clinic_id) && isWithinInterval(new Date(a.start_time), bounds),
+    )
     return { currentFinances: currF, prevFinances: prevF, currentAppts: currA }
-  }, [finances, appointments, bounds])
+  }, [finances, appointments, bounds, filteredClinics])
 
   const totalRevenue = currentFinances.reduce((acc, f) => acc + f.amount, 0)
   const totalAppointmentsCount = currentAppts.length
-  const avgClinicRevenue = clinics.length ? totalRevenue / clinics.length : 0
+  const avgClinicRevenue = filteredClinics.length ? totalRevenue / filteredClinics.length : 0
 
   const clinicStats = useMemo(() => {
-    return clinics
+    return filteredClinics
       .map((clinic) => {
         const cFinances = currentFinances.filter((f) => f.clinic_id === clinic.id)
         const pFinances = prevFinances.filter((f) => f.clinic_id === clinic.id)
@@ -142,6 +213,8 @@ export default function FranchiseDashboard() {
         return {
           id: clinic.id,
           name: clinic.name,
+          region: clinic.region,
+          state: clinic.state,
           revenue: cRev,
           appointments: cAppts.length,
           variation,
@@ -149,7 +222,152 @@ export default function FranchiseDashboard() {
         }
       })
       .sort((a, b) => b.revenue - a.revenue)
-  }, [clinics, currentFinances, prevFinances, currentAppts])
+  }, [filteredClinics, currentFinances, prevFinances, currentAppts])
+
+  const occupancyStats = useMemo(() => {
+    if (!bounds || filteredClinics.length === 0) return { professionals: [], specialties: [] }
+    const daysInPeriod = Math.max(
+      1,
+      Math.ceil((bounds.end.getTime() - bounds.start.getTime()) / 86400000),
+    )
+    const workDays = Math.ceil(daysInPeriod * (5 / 7))
+
+    const profMap = new Map()
+    const specMap = new Map()
+
+    const getDailyHours = (start?: string, end?: string) => {
+      if (!start || !end) return 8
+      const [sh, sm] = start.split(':').map(Number)
+      const [eh, em] = end.split(':').map(Number)
+      return Math.max(1, eh + em / 60 - (sh + sm / 60))
+    }
+
+    currentAppts.forEach((a) => {
+      const clinic = filteredClinics.find((c) => c.id === a.clinic_id)
+      if (!clinic) return
+
+      const profId = a.professional_id
+      const spec = a.specialty || 'Clínico Geral'
+
+      if (profId) {
+        if (!profMap.has(profId)) {
+          const dailyHours = getDailyHours(clinic.opening_time, clinic.closing_time)
+          profMap.set(profId, {
+            count: 0,
+            capacity: dailyHours * workDays,
+            clinicName: clinic.name,
+          })
+        }
+        profMap.get(profId).count++
+      }
+
+      specMap.set(spec, (specMap.get(spec) || 0) + 1)
+    })
+
+    const professionals = Array.from(profMap.entries())
+      .map(([id, data]) => {
+        const user = usersList.find((u) => u.id === id)
+        return {
+          id,
+          name: user?.name || 'Profissional',
+          clinicName: data.clinicName,
+          rate: Math.min(100, (data.count / Math.max(1, data.capacity)) * 100),
+        }
+      })
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 10) // Top 10
+
+    const specialties = Array.from(specMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+
+    return { professionals, specialties }
+  }, [currentAppts, filteredClinics, bounds, usersList])
+
+  const trendData = useMemo(() => {
+    const months = []
+    const n = new Date()
+    const clinicIds = new Set(filteredClinics.map((c) => c.id))
+
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(n, i)
+      months.push({
+        label: format(d, 'MMM/yy', { locale: ptBR }),
+        start: startOfMonth(d),
+        end: endOfMonth(d),
+      })
+    }
+
+    return months.map((m) => {
+      const mFinances = finances.filter(
+        (f) =>
+          clinicIds.has(f.clinic_id) &&
+          isWithinInterval(new Date(f.created), { start: m.start, end: m.end }),
+      )
+      const mAppts = appointments.filter(
+        (a) =>
+          clinicIds.has(a.clinic_id) &&
+          isWithinInterval(new Date(a.start_time), { start: m.start, end: m.end }),
+      )
+      return {
+        month: m.label,
+        revenue: mFinances.reduce((acc, f) => acc + f.amount, 0),
+        appointments: mAppts.length,
+      }
+    })
+  }, [finances, appointments, filteredClinics])
+
+  const exportCSV = () => {
+    const headers = [
+      'Clinica',
+      'Regiao',
+      'Estado',
+      'Receita_R$',
+      'Atendimentos',
+      'Status',
+      'Variacao_%',
+    ]
+    const rows = clinicStats.map((c) => [
+      `"${c.name}"`,
+      `"${c.region || '-'}"`,
+      `"${c.state || '-'}"`,
+      c.revenue.toFixed(2),
+      c.appointments,
+      c.dropWarning ? 'Alerta' : 'Saudavel',
+      c.variation.toFixed(2),
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `relatorio_franquia_${format(new Date(), 'yyyyMMdd')}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto pb-10">
+        <Skeleton className="h-10 w-[300px]" />
+        <div className="grid gap-4 md:grid-cols-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          <Skeleton className="h-[400px] md:col-span-1" />
+          <Skeleton className="h-[400px] md:col-span-2" />
+        </div>
+        <Skeleton className="h-[300px]" />
+      </div>
+    )
+  }
 
   const pieColors = [
     'hsl(var(--chart-1))',
@@ -166,44 +384,16 @@ export default function FranchiseDashboard() {
       color: pieColors[i % pieColors.length],
     }))
 
-  const trendData = useMemo(() => {
-    const months = []
-    const n = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = subMonths(n, i)
-      months.push({
-        label: format(d, 'MMM/yy', { locale: ptBR }),
-        start: startOfMonth(d),
-        end: endOfMonth(d),
-      })
-    }
-
-    return months.map((m) => {
-      const mFinances = finances.filter((f) =>
-        isWithinInterval(new Date(f.created), { start: m.start, end: m.end }),
-      )
-      const mAppts = appointments.filter((a) =>
-        isWithinInterval(new Date(a.start_time), { start: m.start, end: m.end }),
-      )
-      return {
-        month: m.label,
-        revenue: mFinances.reduce((acc, f) => acc + f.amount, 0),
-        appointments: mAppts.length,
-      }
-    })
-  }, [finances, appointments])
-
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">Carregando painel da franquia...</div>
-    )
-  }
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="print:block hidden mb-6 pb-6 border-b">
+        <h1 className="text-3xl font-bold">Relatório Executivo da Franquia</h1>
+        <p className="text-sm text-muted-foreground">
+          Gerado em {format(new Date(), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+        </p>
+      </div>
+
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <BarChart3 className="h-8 w-8 text-primary" />
@@ -213,9 +403,45 @@ export default function FranchiseDashboard() {
             Monitoramento global e performance da rede de clínicas.
           </p>
         </div>
-        <div className="w-full sm:w-48">
+        <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+          <div className="flex items-center bg-background border rounded-md px-3 py-1 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 mr-2" /> {filteredClinics.length} unidades
+          </div>
+
+          <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Regiões</SelectItem>
+              {availableRegions.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedState}
+            onValueChange={setSelectedState}
+            disabled={selectedRegion !== 'all' && availableStates.length === 0}
+          >
+            <SelectTrigger className="w-full sm:w-[120px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {availableStates.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
@@ -224,234 +450,353 @@ export default function FranchiseDashboard() {
               <SelectItem value="quarter">Trimestre Atual</SelectItem>
             </SelectContent>
           </Select>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Exportar</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportCSV}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV (Tabela)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.print()}>
+                <Printer className="h-4 w-4 mr-2" /> Imprimir / PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                totalRevenue,
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">No período selecionado</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Volume de Atendimentos</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAppointmentsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Sessões no período</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalPatients}</div>
-            <p className="text-xs text-muted-foreground mt-1">Pacientes ativos na rede</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Médio por Clínica</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                avgClinicRevenue,
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Receita média / unidade</p>
-          </CardContent>
-        </Card>
-      </div>
+      {filteredClinics.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-muted/20 border rounded-lg border-dashed">
+          <MapPin className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-medium">Nenhuma clínica encontrada</h3>
+          <p className="text-muted-foreground text-center mt-2 max-w-md">
+            Não há unidades operacionais registradas para a combinação de região e estado
+            selecionada no momento.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Faturamento Filtrado</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    totalRevenue,
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">No período selecionado</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Volume de Atendimentos</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalAppointmentsCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">Sessões nas unidades</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{patientsCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">Base global da franquia</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ticket Médio por Unidade</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    avgClinicRevenue,
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Receita média / unidade visível
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle>Distribuição de Receita</CardTitle>
-            <CardDescription>Participação de cada unidade</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {pieData.length > 0 ? (
-                <ChartContainer config={{}} className="h-full w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Tooltip
-                        formatter={(value: number) =>
-                          new Intl.NumberFormat('pt-BR', {
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="md:col-span-2 print:break-inside-avoid">
+              <CardHeader>
+                <CardTitle>Crescimento e Volume</CardTitle>
+                <CardDescription>
+                  Evolução de receita e atendimentos nas unidades selecionadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ChartContainer
+                    config={{
+                      revenue: { label: 'Receita', color: 'hsl(var(--chart-1))' },
+                      appointments: { label: 'Atend.', color: 'hsl(var(--chart-2))' },
+                    }}
+                    className="h-full w-full"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={trendData}
+                        margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis
+                          yAxisId="left"
+                          tickFormatter={(v) => `R$${v / 1000}k`}
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="var(--color-revenue)"
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                          name="Receita"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="appointments"
+                          stroke="var(--color-appointments)"
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                          name="Atendimentos"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-1 print:break-inside-avoid">
+              <CardHeader>
+                <CardTitle>Distribuição de Receita</CardTitle>
+                <CardDescription>Participação de cada unidade visível</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  {pieData.length > 0 ? (
+                    <ChartContainer config={{}} className="h-full w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip
+                            formatter={(value: number) =>
+                              new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(value)
+                            }
+                          />
+                          <Legend verticalAlign="bottom" height={36} />
+                          <Pie
+                            data={pieData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={2}
+                            label={false}
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                      Sem receita no período
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>Painel Analítico de Ocupação</CardTitle>
+              <CardDescription>
+                Utilização da capacidade da rede: comparativo entre demanda e capacidade instalada.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-8">
+                <div>
+                  <h4 className="text-sm font-medium mb-4 flex items-center justify-between">
+                    <span>Taxa de Ocupação (Top Profissionais)</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      Capacidade baseada no horário da clínica
+                    </span>
+                  </h4>
+                  <div className="space-y-3">
+                    {occupancyStats.professionals.length > 0 ? (
+                      occupancyStats.professionals.map((p) => (
+                        <div key={p.id} className="flex justify-between items-center">
+                          <div className="overflow-hidden">
+                            <p className="text-sm font-medium truncate">{p.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{p.clinicName}</p>
+                          </div>
+                          <Badge
+                            variant={p.rate > 90 ? 'destructive' : 'outline'}
+                            className={`ml-4 flex-shrink-0 ${
+                              p.rate < 40 && p.rate > 0
+                                ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-100'
+                                : ''
+                            }`}
+                          >
+                            {p.rate.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Sem dados de atendimento
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-4">
+                    Volume por Especialidade / Procedimento
+                  </h4>
+                  <div className="h-[250px]">
+                    {occupancyStats.specialties.length > 0 ? (
+                      <ChartContainer
+                        config={{ count: { label: 'Atend.', color: 'hsl(var(--chart-3))' } }}
+                        className="h-full w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={occupancyStats.specialties}
+                            layout="vertical"
+                            margin={{ top: 0, right: 20, left: 20, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" hide />
+                            <YAxis
+                              dataKey="name"
+                              type="category"
+                              width={120}
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip content={<ChartTooltipContent />} />
+                            <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                        Sem dados suficientes
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>Desempenho por Unidade</CardTitle>
+              <CardDescription>
+                Receita, volume de atendimentos e status em relação ao período anterior
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Clínica</TableHead>
+                      <TableHead>Região / Estado</TableHead>
+                      <TableHead className="text-right">Receita</TableHead>
+                      <TableHead className="text-right">Atendimentos</TableHead>
+                      <TableHead className="text-center">Status de Performance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clinicStats.map((clinic) => (
+                      <TableRow key={clinic.id}>
+                        <TableCell className="font-medium">{clinic.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {clinic.region || '-'} {clinic.state ? `/ ${clinic.state}` : ''}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
-                          }).format(value)
-                        }
-                      />
-                      <Legend verticalAlign="bottom" height={36} />
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        label={false}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                  Sem receita no período
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Crescimento da Franquia (6 Meses)</CardTitle>
-            <CardDescription>Evolução de receita e atendimentos em toda a rede</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ChartContainer
-                config={{
-                  revenue: { label: 'Receita', color: 'hsl(var(--chart-1))' },
-                  appointments: { label: 'Atend.', color: 'hsl(var(--chart-2))' },
-                }}
-                className="h-full w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis
-                      yAxisId="left"
-                      tickFormatter={(v) => `R$${v / 1000}k`}
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="var(--color-revenue)"
-                      strokeWidth={3}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Receita"
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="appointments"
-                      stroke="var(--color-appointments)"
-                      strokeWidth={3}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Atendimentos"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Desempenho por Unidade</CardTitle>
-          <CardDescription>
-            Receita, volume de atendimentos e status em relação ao período anterior
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Clínica</TableHead>
-                  <TableHead className="text-right">Receita</TableHead>
-                  <TableHead className="text-right">Atendimentos</TableHead>
-                  <TableHead className="text-center">Status de Performance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clinicStats.map((clinic) => (
-                  <TableRow key={clinic.id}>
-                    <TableCell className="font-medium">{clinic.name}</TableCell>
-                    <TableCell className="text-right">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(clinic.revenue)}
-                    </TableCell>
-                    <TableCell className="text-right">{clinic.appointments}</TableCell>
-                    <TableCell className="text-center">
-                      {clinic.dropWarning ? (
-                        <Badge
-                          variant="destructive"
-                          className="flex items-center justify-center gap-1 w-32 mx-auto"
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          Alerta ({clinic.variation > 0 ? '+' : ''}
-                          {clinic.variation.toFixed(1)}%)
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="text-green-600 border-green-600 bg-green-50 flex items-center justify-center gap-1 w-32 mx-auto"
-                        >
-                          <TrendingUp className="w-3 h-3" />
-                          Saudável ({clinic.variation > 0 ? '+' : ''}
-                          {clinic.variation.toFixed(1)}%)
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {clinicStats.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                      Nenhuma clínica encontrada.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                          }).format(clinic.revenue)}
+                        </TableCell>
+                        <TableCell className="text-right">{clinic.appointments}</TableCell>
+                        <TableCell className="text-center">
+                          {clinic.dropWarning ? (
+                            <Badge
+                              variant="destructive"
+                              className="flex items-center justify-center gap-1 w-32 mx-auto"
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              Alerta ({clinic.variation > 0 ? '+' : ''}
+                              {clinic.variation.toFixed(1)}%)
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-green-600 border-green-600 bg-green-50 flex items-center justify-center gap-1 w-32 mx-auto"
+                            >
+                              <TrendingUp className="w-3 h-3" />
+                              Saudável ({clinic.variation > 0 ? '+' : ''}
+                              {clinic.variation.toFixed(1)}%)
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

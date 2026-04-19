@@ -32,6 +32,8 @@ export default function Settings() {
     address: '',
     opening_time: '',
     closing_time: '',
+    region: '',
+    state: '',
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoUrl, setLogoUrl] = useState('')
@@ -61,6 +63,8 @@ export default function Settings() {
           address: record.address || '',
           opening_time: record.opening_time || '08:00',
           closing_time: record.closing_time || '18:00',
+          region: record.region || '',
+          state: record.state || '',
         })
         if (record.logo) {
           setLogoUrl(pb.files.getURL(record, record.logo))
@@ -87,6 +91,8 @@ export default function Settings() {
       formData.append('address', clinicSettings.address)
       formData.append('opening_time', clinicSettings.opening_time)
       formData.append('closing_time', clinicSettings.closing_time)
+      formData.append('region', clinicSettings.region)
+      formData.append('state', clinicSettings.state)
       if (logoFile) {
         formData.append('logo', logoFile)
       }
@@ -255,6 +261,28 @@ export default function Settings() {
                     value={clinicSettings.closing_time}
                     onChange={(e) =>
                       setClinicSettings({ ...clinicSettings, closing_time: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-region">Região</Label>
+                  <Input
+                    id="clinic-region"
+                    placeholder="Ex: Sul, Nordeste"
+                    value={clinicSettings.region}
+                    onChange={(e) =>
+                      setClinicSettings({ ...clinicSettings, region: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-state">Estado</Label>
+                  <Input
+                    id="clinic-state"
+                    placeholder="Ex: SP, RJ, MG"
+                    value={clinicSettings.state}
+                    onChange={(e) =>
+                      setClinicSettings({ ...clinicSettings, state: e.target.value })
                     }
                   />
                 </div>

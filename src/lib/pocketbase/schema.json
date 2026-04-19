@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:41:53.438Z",
+  "generatedAt": "2026-04-19T17:48:56.832Z",
   "collections": [
     {
       "name": "users",
@@ -439,6 +439,18 @@
         {
           "name": "revenue_alert_threshold",
           "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
           "required": false,
           "system": false
         }
