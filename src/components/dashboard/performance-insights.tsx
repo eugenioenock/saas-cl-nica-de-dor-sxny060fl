@@ -46,7 +46,7 @@ export function PerformanceInsights() {
   if (insights.length === 0) return null
 
   return (
-    <Card className="col-span-full mt-6 shadow-sm border-blue-100 dark:border-blue-950">
+    <Card className="col-span-full mt-0 shadow-sm border-blue-100 dark:border-blue-950">
       <CardHeader className="pb-3 bg-blue-50/30 dark:bg-blue-950/10">
         <CardTitle className="text-lg flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400" />
