@@ -19,27 +19,28 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
+import bodyImage from '@/assets/corpo-humano-a2474.jpg'
 
 const ANATOMY_REGIONS = [
-  { id: 'cervical', name: 'Coluna Cervical', view: 'front', x: 50, y: 15, w: 12, h: 8 },
-  { id: 'toracica', name: 'Coluna Torácica', view: 'front', x: 50, y: 30, w: 14, h: 12 },
-  { id: 'lombar', name: 'Coluna Lombar', view: 'front', x: 50, y: 48, w: 16, h: 10 },
-  { id: 'ombro_dir', name: 'Ombro Direito', view: 'front', x: 30, y: 22, w: 14, h: 10 },
-  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'front', x: 70, y: 22, w: 14, h: 10 },
-  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'front', x: 20, y: 40, w: 10, h: 8 },
-  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'front', x: 80, y: 40, w: 10, h: 8 },
-  { id: 'punho_dir', name: 'Punho Direito', view: 'front', x: 12, y: 55, w: 8, h: 8 },
-  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'front', x: 88, y: 55, w: 8, h: 8 },
-  { id: 'quadril_dir', name: 'Quadril Direito', view: 'front', x: 40, y: 55, w: 14, h: 12 },
-  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'front', x: 60, y: 55, w: 14, h: 12 },
-  { id: 'joelho_dir', name: 'Joelho Direito', view: 'front', x: 35, y: 75, w: 12, h: 10 },
-  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 75, w: 12, h: 10 },
-  { id: 'pe_dir', name: 'Pé Direito', view: 'front', x: 32, y: 95, w: 14, h: 8 },
-  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'front', x: 68, y: 95, w: 14, h: 8 },
+  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 12, w: 10, h: 8 },
+  { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 25, w: 14, h: 12 },
+  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 42, w: 16, h: 10 },
+  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'back', x: 32, y: 20, w: 12, h: 10 },
+  { id: 'ombro_dir', name: 'Ombro Direito', view: 'back', x: 68, y: 20, w: 12, h: 10 },
+  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'back', x: 22, y: 40, w: 10, h: 8 },
+  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'back', x: 78, y: 40, w: 10, h: 8 },
+  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 15, y: 52, w: 8, h: 8 },
+  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 85, y: 52, w: 8, h: 8 },
+  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'back', x: 42, y: 52, w: 12, h: 12 },
+  { id: 'quadril_dir', name: 'Quadril Direito', view: 'back', x: 58, y: 52, w: 12, h: 12 },
+  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 42, y: 75, w: 10, h: 10 },
+  { id: 'joelho_dir', name: 'Joelho Direito', view: 'back', x: 58, y: 75, w: 10, h: 10 },
+  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'back', x: 42, y: 95, w: 10, h: 8 },
+  { id: 'pe_dir', name: 'Pé Direito', view: 'back', x: 58, y: 95, w: 10, h: 8 },
 ]
 
 export function BodyMap({ patientId }: { patientId: string }) {
-  const view = 'front'
+  const view = 'back'
   const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -173,12 +174,15 @@ export function BodyMap({ patientId }: { patientId: string }) {
       <div className="relative border rounded-xl bg-slate-950 flex flex-col overflow-hidden shadow-inner">
         <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
           <div className="relative w-full max-w-[260px] aspect-[1/2] rounded-lg overflow-hidden">
-            <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
             <img
-              src="https://img.usecurling.com/p/600/1200?q=skeleton%20x-ray%20anatomy%20medical&color=cyan"
-              alt="Skeleton X-Ray"
-              className="w-full h-full object-cover pointer-events-none opacity-80 mix-blend-screen"
-              style={{ filter: 'hue-rotate(30deg) brightness(1.2)' }}
+              src={bodyImage}
+              alt="Anatomia Muscular (Costas)"
+              className="w-full h-full object-cover pointer-events-none transition-opacity duration-500"
+              onError={(e) => {
+                e.currentTarget.src =
+                  'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+              }}
             />
 
             {ANATOMY_REGIONS.map((region) => {
@@ -192,8 +196,8 @@ export function BodyMap({ patientId }: { patientId: string }) {
                   className={cn(
                     'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
                     isActive
-                      ? 'bg-red-600/50 shadow-[0_0_30px_15px_rgba(220,38,38,0.7)] z-20 border border-red-500/30 mix-blend-screen animate-pulse backdrop-blur-[1px]'
-                      : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
+                      ? 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]'
+                      : 'hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50',
                     isHovered && isActive && 'ring-2 ring-white/50 scale-110',
                   )}
                   style={{
@@ -270,7 +274,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
                         {i + 1}
                       </div>
                       <span className="capitalize text-muted-foreground text-xs font-normal">
-                        ({p.name || (p.view === 'front' ? 'Frente' : 'Costas')})
+                        ({p.name || (p.view === 'back' ? 'Costas' : 'Frente')})
                       </span>
                     </CardTitle>
                     <Button
