@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
@@ -20,48 +19,27 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
-import backViewImg from '@/assets/corpo-humano-a22bb.jpg'
-
-type MapView = 'front' | 'back'
 
 const ANATOMY_REGIONS = [
-  { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 14, w: 14, h: 10 },
-  { id: 'toracica', name: 'Coluna Toráxica', view: 'back', x: 50, y: 28, w: 16, h: 15 },
-  { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 46, w: 18, h: 12 },
-
-  { id: 'ombro_dir_f', name: 'Ombro Direito', view: 'front', x: 28, y: 20, w: 15, h: 12 },
-  { id: 'ombro_esq_f', name: 'Ombro Esquerdo', view: 'front', x: 72, y: 20, w: 15, h: 12 },
-  { id: 'ombro_dir_b', name: 'Ombro Direito', view: 'back', x: 72, y: 20, w: 15, h: 12 },
-  { id: 'ombro_esq_b', name: 'Ombro Esquerdo', view: 'back', x: 28, y: 20, w: 15, h: 12 },
-
-  { id: 'cotovelo_dir_f', name: 'Cotovelo Direito', view: 'front', x: 18, y: 40, w: 12, h: 10 },
-  { id: 'cotovelo_esq_f', name: 'Cotovelo Esquerdo', view: 'front', x: 82, y: 40, w: 12, h: 10 },
-  { id: 'cotovelo_dir_b', name: 'Cotovelo Direito', view: 'back', x: 82, y: 40, w: 12, h: 10 },
-  { id: 'cotovelo_esq_b', name: 'Cotovelo Esquerdo', view: 'back', x: 18, y: 40, w: 12, h: 10 },
-
-  { id: 'punho_dir_f', name: 'Punho Direito', view: 'front', x: 10, y: 55, w: 10, h: 8 },
-  { id: 'punho_esq_f', name: 'Punho Esquerdo', view: 'front', x: 90, y: 55, w: 10, h: 8 },
-  { id: 'punho_dir_b', name: 'Punho Direito', view: 'back', x: 90, y: 55, w: 10, h: 8 },
-  { id: 'punho_esq_b', name: 'Punho Esquerdo', view: 'back', x: 10, y: 55, w: 10, h: 8 },
-
-  { id: 'quadril_dir_f', name: 'Quadril Direito', view: 'front', x: 38, y: 52, w: 16, h: 12 },
-  { id: 'quadril_esq_f', name: 'Quadril Esquerdo', view: 'front', x: 62, y: 52, w: 16, h: 12 },
-  { id: 'quadril_dir_b', name: 'Quadril Direito', view: 'back', x: 62, y: 52, w: 16, h: 12 },
-  { id: 'quadril_esq_b', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 52, w: 16, h: 12 },
-
-  { id: 'joelho_dir_f', name: 'Joelho Direito', view: 'front', x: 35, y: 75, w: 15, h: 10 },
-  { id: 'joelho_esq_f', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 75, w: 15, h: 10 },
-  { id: 'joelho_dir_b', name: 'Joelho Direito', view: 'back', x: 65, y: 75, w: 15, h: 10 },
-  { id: 'joelho_esq_b', name: 'Joelho Esquerdo', view: 'back', x: 35, y: 75, w: 15, h: 10 },
-
-  { id: 'pe_dir_f', name: 'Pé Direito', view: 'front', x: 32, y: 95, w: 16, h: 8 },
-  { id: 'pe_esq_f', name: 'Pé Esquerdo', view: 'front', x: 68, y: 95, w: 16, h: 8 },
-  { id: 'pe_dir_b', name: 'Pé Direito', view: 'back', x: 68, y: 95, w: 16, h: 8 },
-  { id: 'pe_esq_b', name: 'Pé Esquerdo', view: 'back', x: 32, y: 95, w: 16, h: 8 },
+  { id: 'cervical', name: 'Coluna Cervical', view: 'front', x: 50, y: 15, w: 12, h: 8 },
+  { id: 'toracica', name: 'Coluna Torácica', view: 'front', x: 50, y: 30, w: 14, h: 12 },
+  { id: 'lombar', name: 'Coluna Lombar', view: 'front', x: 50, y: 48, w: 16, h: 10 },
+  { id: 'ombro_dir', name: 'Ombro Direito', view: 'front', x: 30, y: 22, w: 14, h: 10 },
+  { id: 'ombro_esq', name: 'Ombro Esquerdo', view: 'front', x: 70, y: 22, w: 14, h: 10 },
+  { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'front', x: 20, y: 40, w: 10, h: 8 },
+  { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'front', x: 80, y: 40, w: 10, h: 8 },
+  { id: 'punho_dir', name: 'Punho Direito', view: 'front', x: 12, y: 55, w: 8, h: 8 },
+  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'front', x: 88, y: 55, w: 8, h: 8 },
+  { id: 'quadril_dir', name: 'Quadril Direito', view: 'front', x: 40, y: 55, w: 14, h: 12 },
+  { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'front', x: 60, y: 55, w: 14, h: 12 },
+  { id: 'joelho_dir', name: 'Joelho Direito', view: 'front', x: 35, y: 75, w: 12, h: 10 },
+  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'front', x: 65, y: 75, w: 12, h: 10 },
+  { id: 'pe_dir', name: 'Pé Direito', view: 'front', x: 32, y: 95, w: 14, h: 8 },
+  { id: 'pe_esq', name: 'Pé Esquerdo', view: 'front', x: 68, y: 95, w: 14, h: 8 },
 ]
 
 export function BodyMap({ patientId }: { patientId: string }) {
-  const [view, setView] = useState<MapView>('front')
+  const view = 'front'
   const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -180,10 +158,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
     }
   }
 
-  const visiblePoints = points.filter(
-    (p) => p.view === view || ANATOMY_REGIONS.some((r) => r.name === p.name && r.view === view),
-  )
-  const displayedPointsPanel = points.filter((p) => p.view === view) // For the right panel, we use the original view
+  const displayedPointsPanel = points
 
   if (loading)
     return (
@@ -196,53 +171,17 @@ export function BodyMap({ patientId }: { patientId: string }) {
   return (
     <div className="grid lg:grid-cols-2 gap-6 h-[600px]">
       <div className="relative border rounded-xl bg-slate-950 flex flex-col overflow-hidden shadow-inner">
-        <div className="flex justify-center p-3 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm z-30">
-          <Tabs
-            value={view}
-            onValueChange={(v) => setView(v as MapView)}
-            className="w-full max-w-[200px]"
-          >
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800 text-slate-400">
-              <TabsTrigger
-                value="front"
-                className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-              >
-                Frente
-              </TabsTrigger>
-              <TabsTrigger
-                value="back"
-                className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-              >
-                Costas
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <div
-          className={cn(
-            'flex-1 relative flex items-center justify-center p-4 overflow-hidden transition-colors duration-300',
-            view === 'front' ? 'bg-slate-950' : 'bg-slate-100 dark:bg-slate-200',
-          )}
-        >
-          <div className="relative w-full max-w-[220px] aspect-[1/2] rounded-lg overflow-hidden">
-            {view === 'front' && (
-              <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
-            )}
+        <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
+          <div className="relative w-full max-w-[260px] aspect-[1/2] rounded-lg overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
             <img
-              src={
-                view === 'front'
-                  ? `https://img.usecurling.com/p/600/1200?q=medical%20x-ray%20anatomy%203d%20model%20front&color=cyan`
-                  : backViewImg
-              }
-              alt={`Body ${view}`}
-              className={cn(
-                'w-full h-full object-cover pointer-events-none transition-opacity duration-500',
-                view === 'front' ? 'mix-blend-screen opacity-80' : 'opacity-100 mix-blend-multiply',
-              )}
+              src="https://img.usecurling.com/p/600/1200?q=skeleton%20x-ray%20anatomy%20medical&color=cyan"
+              alt="Skeleton X-Ray"
+              className="w-full h-full object-cover pointer-events-none opacity-80 mix-blend-screen"
+              style={{ filter: 'hue-rotate(30deg) brightness(1.2)' }}
             />
 
-            {ANATOMY_REGIONS.filter((h) => h.view === view).map((region) => {
+            {ANATOMY_REGIONS.map((region) => {
               const pt = points.find((p) => p.name === region.name)
               const isActive = !!pt
               const isHovered = pt ? hoveredPointId === pt.id : false
@@ -253,12 +192,8 @@ export function BodyMap({ patientId }: { patientId: string }) {
                   className={cn(
                     'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
                     isActive
-                      ? view === 'front'
-                        ? 'bg-red-500/40 shadow-[0_0_25px_10px_rgba(239,68,68,0.8)] z-20 border border-red-500/50 mix-blend-screen animate-pulse'
-                        : 'bg-red-600/60 shadow-[0_0_30px_15px_rgba(220,38,38,0.6)] z-20 border border-red-600/50 mix-blend-multiply animate-pulse'
-                      : view === 'front'
-                        ? 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30'
-                        : 'hover:bg-red-500/20 hover:shadow-[0_0_15px_5px_rgba(239,68,68,0.2)] z-10 border border-transparent hover:border-red-500/30',
+                      ? 'bg-red-600/50 shadow-[0_0_30px_15px_rgba(220,38,38,0.7)] z-20 border border-red-500/30 mix-blend-screen animate-pulse backdrop-blur-[1px]'
+                      : 'hover:bg-cyan-400/20 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.3)] z-10 border border-transparent hover:border-cyan-400/30',
                     isHovered && isActive && 'ring-2 ring-white/50 scale-110',
                   )}
                   style={{
@@ -281,45 +216,6 @@ export function BodyMap({ patientId }: { patientId: string }) {
                 />
               )
             })}
-
-            {visiblePoints
-              .filter((p) => !ANATOMY_REGIONS.some((r) => r.name === p.name))
-              .map((p) => {
-                const isHovered = hoveredPointId === p.id
-                const intensityColor =
-                  (p.intensity || 5) >= 8
-                    ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]'
-                    : (p.intensity || 5) >= 5
-                      ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]'
-                      : 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.8)]'
-                return (
-                  <div
-                    key={p.id}
-                    className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 group z-30"
-                    style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeletePoint(p.id)
-                    }}
-                    onMouseEnter={() => setHoveredPointId(p.id)}
-                    onMouseLeave={() => setHoveredPointId(null)}
-                  >
-                    <div
-                      className={cn(
-                        'absolute inset-1 rounded-full animate-pulse blur-[3px] opacity-80',
-                        intensityColor.replace('bg-', 'bg-').replace('500', '600'),
-                      )}
-                    />
-                    <div
-                      className={cn(
-                        'relative w-2.5 h-2.5 rounded-full transition-transform',
-                        isHovered ? 'scale-150 ring-2 ring-white/50' : '',
-                        intensityColor,
-                      )}
-                    />
-                  </div>
-                )
-              })}
           </div>
         </div>
       </div>
@@ -336,10 +232,14 @@ export function BodyMap({ patientId }: { patientId: string }) {
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
             {displayedPointsPanel.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                <p>Nenhum ponto registrado para esta visão.</p>
-                <p className="text-sm mt-1">
-                  Interaja com a imagem ao lado para adicionar marcadores e iniciar a documentação.
+              <div className="text-center text-muted-foreground py-16 flex flex-col items-center">
+                <div className="bg-muted/30 p-4 rounded-full mb-4">
+                  <MapPin className="h-8 w-8 text-primary/40" strokeWidth={1.5} />
+                </div>
+                <p className="text-base font-semibold text-foreground">Nenhum ponto registrado.</p>
+                <p className="text-sm opacity-80 mt-2 max-w-[280px]">
+                  Clique na imagem anatômica para adicionar um novo ponto de dor e iniciar o
+                  mapeamento.
                 </p>
               </div>
             ) : (
