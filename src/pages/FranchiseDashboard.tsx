@@ -30,7 +30,7 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   BarChart,
@@ -667,7 +667,7 @@ export default function FranchiseDashboard() {
                           tickLine={false}
                           axisLine={false}
                         />
-                        <Tooltip content={<ChartTooltipContent />} />
+                        <RechartsTooltip content={<ChartTooltipContent />} />
                         <Legend />
                         <Line
                           yAxisId="left"
@@ -707,7 +707,7 @@ export default function FranchiseDashboard() {
                     <ChartContainer config={{}} className="h-full w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Tooltip
+                          <RechartsTooltip
                             formatter={(value: number) =>
                               new Intl.NumberFormat('pt-BR', {
                                 style: 'currency',
@@ -813,7 +813,7 @@ export default function FranchiseDashboard() {
                               tickLine={false}
                               axisLine={false}
                             />
-                            <Tooltip content={<ChartTooltipContent />} />
+                            <RechartsTooltip content={<ChartTooltipContent />} />
                             <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
