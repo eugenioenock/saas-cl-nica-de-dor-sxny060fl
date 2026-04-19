@@ -75,8 +75,8 @@ const ANATOMY_REGIONS = [
   { id: 'ombro_dir', name: 'Ombro Direito', view: 'back', x: 66, y: 20, w: 12, h: 10 },
   { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'back', x: 23, y: 38, w: 10, h: 10 },
   { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'back', x: 77, y: 38, w: 10, h: 10 },
-  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 26, y: 49, w: 8, h: 10 },
-  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 74, y: 49, w: 8, h: 10 },
+  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 18, y: 50, w: 8, h: 10 },
+  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 82, y: 50, w: 8, h: 10 },
   { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 54, w: 14, h: 14 },
   { id: 'quadril_dir', name: 'Quadril Direito', view: 'back', x: 62, y: 54, w: 14, h: 14 },
   { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 39, y: 68, w: 12, h: 12 },
@@ -138,25 +138,6 @@ export default function PatientRecord() {
     } else {
       setIsAdjusting(true)
       setDraftPoints(JSON.parse(JSON.stringify(data.points)))
-    }
-  }
-
-  const savePositions = async () => {
-    try {
-      const promises = draftPoints.map((pt) => {
-        const original = data.points.find((p: any) => p.id === pt.id)
-        if (original && (original.x !== pt.x || original.y !== pt.y)) {
-          return pb.collection('pain_points').update(pt.id, { x: pt.x, y: pt.y })
-        }
-        return Promise.resolve()
-      })
-      await Promise.all(promises)
-      toast.success('Posições atualizadas com sucesso!')
-      setIsAdjusting(false)
-      setDraftPoints([])
-      load()
-    } catch (e) {
-      toast.error('Erro ao salvar posições')
     }
   }
 
@@ -418,14 +399,9 @@ export default function PatientRecord() {
                       </TooltipContent>
                     </Tooltip>
                   ) : isAdjusting ? (
-                    <>
-                      <Button size="sm" variant="ghost" onClick={toggleAdjustMode}>
-                        Cancelar
-                      </Button>
-                      <Button size="sm" onClick={savePositions}>
-                        Salvar Posições
-                      </Button>
-                    </>
+                    <Button size="sm" onClick={toggleAdjustMode}>
+                      Concluir Ajustes
+                    </Button>
                   ) : (
                     <Button size="sm" variant="outline" onClick={toggleAdjustMode}>
                       Ajustar Marcadores
@@ -503,16 +479,32 @@ export default function PatientRecord() {
                             prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
                           )
                         }}
-                        onPointerUp={(e) => {
+                        onPointerUp={async (e) => {
                           if (!isAdjusting || draggingPointId !== pt.id) return
                           e.currentTarget.releasePointerCapture(e.pointerId)
                           setDraggingPointId(null)
+
+                          const updatedPoint = draftPoints.find((p) => p.id === pt.id)
+                          const originalPoint = data.points.find((p: any) => p.id === pt.id)
+                          if (
+                            updatedPoint &&
+                            originalPoint &&
+                            (updatedPoint.x !== originalPoint.x ||
+                              updatedPoint.y !== originalPoint.y)
+                          ) {
+                            try {
+                              await pb
+                                .collection('pain_points')
+                                .update(pt.id, { x: updatedPoint.x, y: updatedPoint.y })
+                              toast.success('Posição salva com sucesso')
+                            } catch (err) {
+                              toast.error('Erro ao salvar posição')
+                            }
+                          }
                         }}
                         className={cn(
                           'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
-                          isAdjusting
-                            ? 'cursor-grab active:cursor-grabbing z-30'
-                            : 'cursor-pointer z-20',
+                          isAdjusting ? 'cursor-move z-30' : 'cursor-pointer z-20',
                           isAdjusting
                             ? draggingPointId === pt.id
                               ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
