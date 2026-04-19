@@ -16,6 +16,7 @@ import {
   Building2,
   FileText,
   ArrowRightLeft,
+  PenLine,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -38,6 +39,7 @@ const adminNavItems = [
   { title: 'Prontuários', icon: Activity, url: '/records' },
   { title: 'Estoque', icon: Package, url: '/inventory' },
   { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
+  { title: 'Fornecedores', icon: Building2, url: '/inventory/suppliers' },
   { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
   { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
   { title: 'Meu Financeiro', icon: DollarSign, url: '/professional/finance' },
@@ -70,7 +72,18 @@ const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolea
     adminOnly: true,
   },
   { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
-  { title: 'Auditoria', icon: Activity, url: '/settings/audit-history', adminOnly: true },
+  {
+    title: 'Auditoria de Sistema',
+    icon: Activity,
+    url: '/settings/audit-history',
+    adminOnly: true,
+  },
+  {
+    title: 'Auditoria de Assinaturas',
+    icon: PenLine,
+    url: '/settings/signature-audit',
+    adminOnly: true,
+  },
 ]
 
 export function AppSidebar() {

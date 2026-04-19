@@ -593,6 +593,42 @@ export default function Reports() {
         ) : activeTab === 'efficiency' ? (
           <div className="mb-8">
             <h2 className="text-lg font-bold mb-4 uppercase bg-gray-100 p-2 rounded">
+              Comparativo de Custos por Protocolo
+            </h2>
+            <table className="w-full border-collapse mt-2 mb-8">
+              <thead>
+                <tr className="border-b-2 border-gray-300 text-left">
+                  <th className="p-2 font-bold">Protocolo</th>
+                  <th className="p-2 font-bold text-right">Custo Estimado</th>
+                  <th className="p-2 font-bold text-right">Custo Real</th>
+                  <th className="p-2 font-bold text-right">Diferença</th>
+                </tr>
+              </thead>
+              <tbody>
+                {efficiencyChartData.map((data) => (
+                  <tr key={data.name} className="border-b border-gray-200">
+                    <td className="p-2">{data.name}</td>
+                    <td className="p-2 text-right">R$ {data.plannedCost.toFixed(2)}</td>
+                    <td className="p-2 text-right">R$ {data.actualCost.toFixed(2)}</td>
+                    <td
+                      className="p-2 text-right font-medium"
+                      style={{ color: data.actualCost > data.plannedCost ? 'red' : 'green' }}
+                    >
+                      R$ {(data.actualCost - data.plannedCost).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                {efficiencyChartData.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-4 text-center text-gray-500">
+                      Nenhum dado de protocolo disponível.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            <h2 className="text-lg font-bold mb-4 uppercase bg-gray-100 p-2 rounded">
               Desperdício Detectado
             </h2>
             <table className="w-full border-collapse mt-2">

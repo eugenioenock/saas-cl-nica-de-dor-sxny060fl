@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T18:40:44.945Z",
+  "generatedAt": "2026-04-19T18:48:22.351Z",
   "collections": [
     {
       "name": "users",
@@ -1054,7 +1054,8 @@
             "approved",
             "ordered",
             "received",
-            "cancelled"
+            "cancelled",
+            "quote_requested"
           ]
         },
         {
@@ -1089,6 +1090,13 @@
           "required": false,
           "system": false,
           "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "supplier_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "suppliers"
         }
       ],
       "indexes": []
@@ -1774,6 +1782,66 @@
       "indexes": [
         "CREATE INDEX idx_prof_goals_prof_month ON professional_goals (professional_id, month)"
       ]
+    },
+    {
+      "name": "suppliers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id",
+        "view": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'manager')",
+        "update": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role = 'admin' || @request.auth.role = 'manager')",
+        "delete": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role = 'admin' || @request.auth.role = 'manager')"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "materials",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clinical_inventory"
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

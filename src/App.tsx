@@ -34,6 +34,8 @@ import FranchiseDashboard from './pages/FranchiseDashboard'
 import FranchiseTemplates from './pages/FranchiseTemplates'
 import FranchiseTransfers from './pages/FranchiseTransfers'
 import ProfessionalFinance from './pages/ProfessionalFinance'
+import SignatureAudit from './pages/SignatureAudit'
+import Suppliers from './pages/Suppliers'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -80,6 +82,7 @@ const App = () => (
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/inventory/orders" element={<Orders />} />
               <Route path="/inventory/usage/quick" element={<QuickUsage />} />
+              <Route path="/inventory/suppliers" element={<Suppliers />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/insurance" element={<Insurance />} />
               <Route path="/reports" element={<Reports />} />
@@ -87,6 +90,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/integrations" element={<Integrations />} />
               <Route path="/settings/audit-history" element={<AuditHistory />} />
+              <Route path="/settings/signature-audit" element={<SignatureAudit />} />
               <Route path="/settings/access-control" element={<SettingsAccessControl />} />
               <Route path="/settings/reports" element={<SettingsReports />} />
               <Route path="/settings/maintenance" element={<SettingsMaintenance />} />
