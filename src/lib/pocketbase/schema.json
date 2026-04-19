@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T18:19:48.436Z",
+  "generatedAt": "2026-04-19T18:24:40.258Z",
   "collections": [
     {
       "name": "users",
@@ -1606,8 +1606,8 @@
       "name": "notifications",
       "type": "base",
       "apiRules": {
-        "list": "user_id = @request.auth.id",
-        "view": "user_id = @request.auth.id",
+        "list": "user_id = @request.auth.id || (@request.auth.role = 'manager' && clinic_id = @request.auth.clinic_id) || @request.auth.role = 'admin'",
+        "view": "user_id = @request.auth.id || (@request.auth.role = 'manager' && clinic_id = @request.auth.clinic_id) || @request.auth.role = 'admin'",
         "create": null,
         "update": "user_id = @request.auth.id",
         "delete": null
@@ -1637,7 +1637,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["milestone", "bonus_tier", "system"]
+          "selectValues": ["milestone", "bonus_tier", "system", "performance_insight"]
         },
         {
           "name": "is_read",

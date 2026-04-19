@@ -257,7 +257,11 @@ export function AppHeader() {
                       <div className="flex justify-between w-full items-start mb-1">
                         <span className="font-medium text-sm pr-2 text-foreground">{n.title}</span>
                         <Badge variant="outline" className="text-[10px] uppercase bg-primary/5">
-                          {n.type === 'bonus_tier' ? 'Conquista' : 'Alerta'}
+                          {n.type === 'bonus_tier'
+                            ? 'Conquista'
+                            : n.type === 'performance_insight'
+                              ? 'Insight'
+                              : 'Alerta'}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">

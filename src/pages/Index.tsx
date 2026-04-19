@@ -13,6 +13,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { ProfessionalRanking } from '@/components/dashboard/ProfessionalRanking'
+import { PerformanceInsights } from '@/components/dashboard/performance-insights'
 
 interface DashboardData {
   appointmentsToday: number
@@ -243,6 +244,8 @@ export default function Index() {
           </>
         )}
       </div>
+
+      <PerformanceInsights />
 
       {isManager && (
         <div className="mt-6">
