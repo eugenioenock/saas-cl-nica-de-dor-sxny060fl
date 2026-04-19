@@ -75,12 +75,12 @@ const ANATOMY_REGIONS = [
   { id: 'ombro_dir', name: 'Ombro Direito', view: 'back', x: 66, y: 20, w: 12, h: 10 },
   { id: 'cotovelo_esq', name: 'Cotovelo Esquerdo', view: 'back', x: 23, y: 38, w: 10, h: 10 },
   { id: 'cotovelo_dir', name: 'Cotovelo Direito', view: 'back', x: 77, y: 38, w: 10, h: 10 },
-  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 14, y: 50, w: 8, h: 10 },
-  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 86, y: 50, w: 8, h: 10 },
+  { id: 'punho_esq', name: 'Punho Esquerdo', view: 'back', x: 26, y: 49, w: 8, h: 10 },
+  { id: 'punho_dir', name: 'Punho Direito', view: 'back', x: 74, y: 49, w: 8, h: 10 },
   { id: 'quadril_esq', name: 'Quadril Esquerdo', view: 'back', x: 38, y: 54, w: 14, h: 14 },
   { id: 'quadril_dir', name: 'Quadril Direito', view: 'back', x: 62, y: 54, w: 14, h: 14 },
-  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 39, y: 74, w: 12, h: 12 },
-  { id: 'joelho_dir', name: 'Joelho Direito', view: 'back', x: 61, y: 74, w: 12, h: 12 },
+  { id: 'joelho_esq', name: 'Joelho Esquerdo', view: 'back', x: 39, y: 68, w: 12, h: 12 },
+  { id: 'joelho_dir', name: 'Joelho Direito', view: 'back', x: 61, y: 68, w: 12, h: 12 },
   { id: 'pe_esq', name: 'Pé Esquerdo', view: 'back', x: 41, y: 94, w: 10, h: 8 },
   { id: 'pe_dir', name: 'Pé Direito', view: 'back', x: 59, y: 94, w: 10, h: 8 },
 ]
@@ -88,7 +88,6 @@ const ANATOMY_REGIONS = [
 export default function PatientRecord() {
   const { id } = useParams()
   const { user } = useAuth()
-  const canEditPositions = ['admin', 'manager', 'professional'].includes(user?.role)
   const [isAdjusting, setIsAdjusting] = useState(false)
   const [draftPoints, setDraftPoints] = useState<any[]>([])
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
@@ -399,42 +398,40 @@ export default function PatientRecord() {
             <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
                 <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
-                {canEditPositions && (
-                  <div className="flex gap-2">
-                    {data.points.length === 0 ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div tabIndex={0}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled
-                              className="pointer-events-none opacity-50"
-                            >
-                              Ajustar Marcadores
-                            </Button>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : isAdjusting ? (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={toggleAdjustMode}>
-                          Cancelar
-                        </Button>
-                        <Button size="sm" onClick={savePositions}>
-                          Salvar Posições
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={toggleAdjustMode}>
-                        Ajustar Marcadores
+                <div className="flex gap-2">
+                  {data.points.length === 0 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="pointer-events-none opacity-50"
+                          >
+                            Ajustar Marcadores
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : isAdjusting ? (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={toggleAdjustMode}>
+                        Cancelar
                       </Button>
-                    )}
-                  </div>
-                )}
+                      <Button size="sm" onClick={savePositions}>
+                        Salvar Posições
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={toggleAdjustMode}>
+                      Ajustar Marcadores
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-6 bg-slate-950 flex items-center justify-center">
                 <div
@@ -446,8 +443,8 @@ export default function PatientRecord() {
                     src={bodyImage}
                     alt="Anatomia Muscular (Costas)"
                     className={cn(
-                      'w-full h-full object-cover pointer-events-none transition-opacity duration-500',
-                      isAdjusting && 'opacity-80 grayscale-[30%]',
+                      'w-full h-full object-cover pointer-events-none transition-all duration-500',
+                      isAdjusting && 'opacity-80 grayscale-[30%] brightness-75',
                     )}
                     onError={(e) => {
                       e.currentTarget.src =
@@ -516,8 +513,10 @@ export default function PatientRecord() {
                           isAdjusting
                             ? 'cursor-grab active:cursor-grabbing z-30'
                             : 'cursor-pointer z-20',
-                          isAdjusting && draggingPointId === pt.id
-                            ? 'bg-yellow-400/60 shadow-[0_0_20px_10px_rgba(250,204,21,0.6)] border-2 border-yellow-400 scale-110'
+                          isAdjusting
+                            ? draggingPointId === pt.id
+                              ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
+                              : 'bg-yellow-400/40 shadow-[0_0_10px_5px_rgba(250,204,21,0.4)] border-2 border-yellow-400/80'
                             : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
                           isAdjusting &&
                             draggingPointId &&
