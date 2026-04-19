@@ -52,7 +52,18 @@ export function AppSidebar() {
   const location = useLocation()
   const { user } = useAuth()
   const isPatient = user?.role === 'patient'
-  const navItems = isPatient ? patientNavItems : adminNavItems
+  const navItems = isPatient
+    ? patientNavItems
+    : adminNavItems.filter((item) => {
+        if (user?.role === 'admin' || user?.role === 'manager') return true
+        if (user?.role === 'professional') {
+          return ['/dashboard', '/agenda', '/pacientes', '/records', '/reports'].includes(item.url)
+        }
+        if (user?.role === 'receptionist') {
+          return ['/dashboard', '/agenda', '/pacientes'].includes(item.url)
+        }
+        return false
+      })
 
   return (
     <Sidebar variant="inset">
@@ -88,7 +99,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {!isPatient && (
+        {!isPatient && (user?.role === 'admin' || user?.role === 'manager') && (
           <SidebarGroup className="mt-auto">
             <SidebarGroupContent>
               <SidebarMenu>

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ShieldAlert, Trash2, Loader2 } from 'lucide-react'
+import { ShieldAlert, Trash2, Loader2, Download, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface User {
@@ -141,7 +141,7 @@ export default function SettingsAccessControl() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between gap-4 md:items-end">
+      <div className="flex flex-col sm:flex-row justify-between gap-4 md:items-end print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ShieldAlert className="h-8 w-8 text-primary" />
@@ -151,8 +151,28 @@ export default function SettingsAccessControl() {
             Revise e gerencie o nível de acesso e unidades de cada usuário.
           </p>
         </div>
-        <div className="w-full sm:w-64">
-          <Select value={filterClinic} onValueChange={setFilterClinic}>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => {
+            const headers = ['Nome', 'Email', 'Função', 'Acessos']
+            const rows = filteredUsers.map(u => {
+              const uAccesses = u.role === 'admin' ? 'Todas' : accessRecords.filter(a => a.user_id === u.id).map(a => a.expand?.clinic_id?.name || 'Unidade').join('; ')
+              return `"${u.name || ''}","${u.email}","${u.role}","${uAccesses}"`
+            })
+            const csv = [headers.join(','), ...rows].join('\n')
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'auditoria_acessos.csv'
+            a.click()
+          }}>
+            <Download className="mr-2 h-4 w-4" /> CSV
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="mr-2 h-4 w-4" /> PDF
+          </Button>
+          <div className="w-full sm:w-64 ml-2">
+            <Select value={filterClinic} onValueChange={setFilterClinic}>
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por Clínica" />
             </SelectTrigger>
@@ -209,7 +229,9 @@ export default function SettingsAccessControl() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="manager">Gerente</SelectItem>
                               <SelectItem value="professional">Profissional</SelectItem>
+                              <SelectItem value="receptionist">Recepcionista</SelectItem>
                               <SelectItem value="patient">Paciente</SelectItem>
                             </SelectContent>
                           </Select>
@@ -272,6 +294,37 @@ export default function SettingsAccessControl() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Print Layout */}
+      <div className="hidden print:block">
+        <h2 className="text-2xl font-bold mb-4">Relatório de Auditoria de Permissões</h2>
+        <p className="mb-4 text-sm text-gray-500">Emitido em: {new Date().toLocaleString()}</p>
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b-2 border-black">
+              <th className="text-left py-2 font-bold">Usuário</th>
+              <th className="text-left py-2 font-bold">Email</th>
+              <th className="text-left py-2 font-bold">Função</th>
+              <th className="text-left py-2 font-bold">Acessos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredUsers.map(u => {
+              const uAccesses = accessRecords.filter(a => a.user_id === u.id)
+              return (
+                <tr key={u.id} className="border-b border-gray-300">
+                  <td className="py-2">{u.name || 'Sem nome'}</td>
+                  <td className="py-2">{u.email}</td>
+                  <td className="py-2 capitalize">{u.role}</td>
+                  <td className="py-2">
+                    {u.role === 'admin' ? 'Todas as Unidades' : (uAccesses.length > 0 ? uAccesses.map(a => a.expand?.clinic_id?.name).join(', ') : 'Nenhum')}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

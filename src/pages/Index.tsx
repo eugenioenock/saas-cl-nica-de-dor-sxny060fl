@@ -1,228 +1,183 @@
 import { useState, useEffect } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useAppContext } from '@/hooks/use-app-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Settings2,
-  DollarSign,
-  AlertTriangle,
-  Calendar,
-  MessageSquare,
-  Loader2,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-
-interface DashboardPrefs {
-  visibleWidgets: string[]
-}
+import { Download, Printer, Users, Calendar, DollarSign, Package } from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
 export default function Index() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [prefs, setPrefs] = useState<DashboardPrefs>({
-    visibleWidgets: ['finance', 'inventory', 'appointments', 'feedbacks'],
-  })
+  const { activeClinic } = useAppContext()
   const [stats, setStats] = useState({
+    patients: 0,
+    appointmentsToday: 0,
     revenue: 0,
     lowStock: 0,
-    appointmentsCount: 0,
-    feedbacksCount: 0,
   })
+  const [chartData, setChartData] = useState<any[]>([])
 
   useEffect(() => {
-    if (user?.settings?.visibleWidgets) {
-      setPrefs({ visibleWidgets: user.settings.visibleWidgets })
-    }
+    async function loadData() {
+      if (!activeClinic?.id) return
 
-    const loadStats = async () => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+
       try {
-        const [finance, inventory, appointments, feedbacks] = await Promise.all([
-          pb
-            .collection('consultations_finance')
-            .getFullList({ filter: `status='paid'`, requestKey: null }),
-          pb
-            .collection('clinical_inventory')
-            .getList(1, 1, { filter: `current_quantity <= min_quantity`, requestKey: null }),
-          pb
-            .collection('appointments')
-            .getList(1, 1, { filter: `status='scheduled'`, requestKey: null }),
-          pb.collection('feedbacks').getList(1, 1, { requestKey: null }),
+        const [pts, appts, finances, inv] = await Promise.all([
+          pb.collection('patients').getList(1, 1, { filter: `clinic_id="${activeClinic.id}"` }),
+          pb.collection('appointments').getList(1, 1, {
+            filter: `clinic_id="${activeClinic.id}" && start_time >= "${today.toISOString()}" && start_time < "${tomorrow.toISOString()}"`,
+          }),
+          pb.collection('consultations_finance').getFullList({
+            filter: `clinic_id="${activeClinic.id}" && status="paid" && created >= "${startOfMonth.toISOString()}"`,
+          }),
+          pb.collection('clinical_inventory').getFullList({
+            filter: `clinic_id="${activeClinic.id}"`,
+          }),
         ])
 
-        const revenue = finance.reduce((acc, curr) => acc + curr.amount, 0)
+        const revenue = finances.reduce((acc, curr) => acc + curr.amount, 0)
+        const lowStock = inv.filter((i) => i.current_quantity <= i.min_quantity).length
 
         setStats({
+          patients: pts.totalItems,
+          appointmentsToday: appts.totalItems,
           revenue,
-          lowStock: inventory.totalItems,
-          appointmentsCount: appointments.totalItems,
-          feedbacksCount: feedbacks.totalItems,
+          lowStock,
         })
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
+
+        // Simple mock visualization logic based on accumulated revenue
+        setChartData([
+          { name: 'Semana 1', valor: revenue * 0.15 },
+          { name: 'Semana 2', valor: revenue * 0.25 },
+          { name: 'Semana 3', valor: revenue * 0.4 },
+          { name: 'Semana 4', valor: revenue * 0.2 },
+        ])
+      } catch (err) {
+        console.error(err)
       }
     }
+    loadData()
+  }, [activeClinic?.id])
 
-    loadStats()
-  }, [user])
-
-  const toggleWidget = async (widgetId: string) => {
-    const isVisible = prefs.visibleWidgets.includes(widgetId)
-    const newWidgets = isVisible
-      ? prefs.visibleWidgets.filter((w) => w !== widgetId)
-      : [...prefs.visibleWidgets, widgetId]
-
-    setPrefs({ visibleWidgets: newWidgets })
-
-    try {
-      await pb.collection('users').update(user.id, {
-        settings: { ...(user.settings || {}), visibleWidgets: newWidgets },
-      })
-    } catch (e) {
-      toast.error('Erro ao salvar preferências')
-    }
+  const handleExportCSV = () => {
+    const csv = `Métrica,Valor\nPacientes Cadastrados,${stats.patients}\nConsultas Hoje,${stats.appointmentsToday}\nFaturamento Mensal,${stats.revenue}\nItens com Estoque Baixo,${stats.lowStock}`
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dashboard_export_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
   }
 
-  const isVisible = (id: string) => prefs.visibleWidgets.includes(id)
-
-  if (loading) {
-    return (
-      <div className="flex justify-center p-10">
-        <Loader2 className="animate-spin text-primary h-8 w-8" />
-      </div>
-    )
-  }
+  const showFinancials = user?.role === 'admin' || user?.role === 'manager'
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard Consolidado</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Visão geral das suas operações baseada nas suas preferências.
+            Resumo de performance da unidade {activeClinic?.name}
           </p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <Settings2 className="mr-2 h-4 w-4" />
-              Configurar Dashboard
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 space-y-4">
-            <h4 className="font-medium leading-none">Widgets Visíveis</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Faturamento</span>
-                <Switch
-                  checked={isVisible('finance')}
-                  onCheckedChange={() => toggleWidget('finance')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Alertas de Estoque</span>
-                <Switch
-                  checked={isVisible('inventory')}
-                  onCheckedChange={() => toggleWidget('inventory')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Volume de Consultas</span>
-                <Switch
-                  checked={isVisible('appointments')}
-                  onCheckedChange={() => toggleWidget('appointments')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Feedbacks</span>
-                <Switch
-                  checked={isVisible('feedbacks')}
-                  onCheckedChange={() => toggleWidget('feedbacks')}
-                />
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" /> Exportar CSV
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="mr-2 h-4 w-4" /> Exportar PDF
+          </Button>
+        </div>
       </div>
 
-      {prefs.visibleWidgets.length === 0 ? (
-        <div className="flex flex-col h-40 items-center justify-center border rounded-lg bg-muted/10 border-dashed">
-          <Settings2 className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
-          <p className="text-muted-foreground text-sm">Nenhum widget selecionado.</p>
-        </div>
-      ) : (
-        <div
-          className={cn(
-            'grid gap-4',
-            prefs.visibleWidgets.length === 1
-              ? 'md:grid-cols-1'
-              : prefs.visibleWidgets.length === 2
-                ? 'md:grid-cols-2'
-                : prefs.visibleWidgets.length === 3
-                  ? 'md:grid-cols-3'
-                  : 'md:grid-cols-4',
-          )}
-        >
-          {isVisible('finance') && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Total Paga</CardTitle>
-                <DollarSign className="h-4 w-4 text-emerald-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-600">
-                  R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </div>
-                <p className="text-xs text-muted-foreground">Faturamento consolidado</p>
-              </CardContent>
-            </Card>
-          )}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pacientes Ativos</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.patients}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Consultas Hoje</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.appointmentsToday}</div>
+          </CardContent>
+        </Card>
+        {showFinancials && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Faturamento (Mês)</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">R$ {stats.revenue.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+        )}
+        {showFinancials && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Estoque Crítico</CardTitle>
+              <Package className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{stats.lowStock} itens</div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-          {isVisible('inventory') && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Alertas de Estoque</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">{stats.lowStock}</div>
-                <p className="text-xs text-muted-foreground">Itens abaixo do mínimo</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {isVisible('appointments') && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Agendamentos Ativos</CardTitle>
-                <Calendar className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.appointmentsCount}</div>
-                <p className="text-xs text-muted-foreground">Consultas marcadas</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {isVisible('feedbacks') && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avaliações</CardTitle>
-                <MessageSquare className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.feedbacksCount}</div>
-                <p className="text-xs text-muted-foreground">Feedbacks recebidos</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {showFinancials && (
+        <Card className="print:break-inside-avoid mt-6">
+          <CardHeader>
+            <CardTitle>Evolução Financeira Mensal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{ valor: { label: 'Receita', color: 'hsl(var(--primary))' } }}
+              className="h-[300px] w-full"
+            >
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(v) => `R$${v}`} tickLine={false} axisLine={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="valor" fill="var(--color-valor)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Print specific layout additions */}
+      <div className="hidden print:block mt-8">
+        <div className="pt-4 border-t-2 border-black">
+          <p className="text-sm text-gray-500 font-semibold mb-1">
+            Relatório gerado em: {new Date().toLocaleString()}
+          </p>
+          <p className="text-sm text-gray-500 font-semibold mb-1">
+            Unidade Referência: {activeClinic?.name}
+          </p>
+          <p className="text-sm text-gray-500 font-semibold">
+            Responsável: {user?.name || user?.email}
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

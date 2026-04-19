@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:00:46.746Z",
+  "generatedAt": "2026-04-19T17:05:49.746Z",
   "collections": [
     {
       "name": "users",
@@ -43,7 +43,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["admin", "professional", "patient"]
+          "selectValues": ["admin", "manager", "professional", "receptionist", "patient"]
         },
         {
           "name": "patient_id",
