@@ -38,10 +38,6 @@ export default function MatrixDashboard() {
   const [inventory, setInventory] = useState<InventoryRecord[]>([])
   const [loading, setLoading] = useState(true)
 
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   useEffect(() => {
     async function loadData() {
       try {
@@ -109,6 +105,10 @@ export default function MatrixDashboard() {
 
     return Object.values(map).filter((d) => d.faturado > 0 || d.pendente > 0)
   }, [filteredFinances, clinics, selectedClinic])
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />
+  }
 
   if (loading) {
     return (

@@ -22,10 +22,6 @@ export default function SettingsMaintenance() {
   const [loading, setLoading] = useState(true)
   const [migrating, setMigrating] = useState(false)
 
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   useEffect(() => {
     pb.collection('clinic_settings')
       .getFullList({ sort: 'name' })
@@ -64,6 +60,10 @@ export default function SettingsMaintenance() {
     } finally {
       setMigrating(false)
     }
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />
   }
 
   if (loading)

@@ -1,5 +1,7 @@
 migrate(
   (app) => {
+    const clinicSettingsId = app.findCollectionByNameOrId('clinic_settings').id
+
     const collection = new Collection({
       name: 'user_clinic_access',
       type: 'base',
@@ -21,7 +23,7 @@ migrate(
           name: 'clinic_id',
           type: 'relation',
           required: true,
-          collectionId: 'clinic_settings',
+          collectionId: clinicSettingsId,
           cascadeDelete: true,
           maxSelect: 1,
         },

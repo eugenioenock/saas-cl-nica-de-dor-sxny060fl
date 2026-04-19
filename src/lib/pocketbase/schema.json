@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T16:51:12.531Z",
+  "generatedAt": "2026-04-19T16:54:47.083Z",
   "collections": [
     {
       "name": "users",
@@ -1141,6 +1141,48 @@
           "required": false,
           "system": false,
           "collectionRef": "clinic_settings"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "user_clinic_access",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.role = 'admin' || user_id = @request.auth.id",
+        "view": "@request.auth.role = 'admin' || user_id = @request.auth.id",
+        "create": "@request.auth.role = 'admin'",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "clinic_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": []

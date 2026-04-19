@@ -37,10 +37,6 @@ export default function SettingsAccessControl() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
 
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   const loadData = async () => {
     try {
       const [usersData, clinicsData, accessData] = await Promise.all([
@@ -91,6 +87,10 @@ export default function SettingsAccessControl() {
     } finally {
       setSaving(null)
     }
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />
   }
 
   if (loading) {
