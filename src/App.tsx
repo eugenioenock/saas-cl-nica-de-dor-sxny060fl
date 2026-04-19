@@ -19,6 +19,7 @@ import Portal from './pages/Portal'
 import Insurance from './pages/Insurance'
 import Orders from './pages/Orders'
 import QuickUsage from './pages/QuickUsage'
+import ReportsPerformance from './pages/ReportsPerformance'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/insurance" element={<Insurance />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/reports/performance" element={<ReportsPerformance />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

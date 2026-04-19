@@ -19,9 +19,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { CheckCircle2, Loader2, ArrowLeft } from 'lucide-react'
+import { CheckCircle2, Loader2, ArrowLeft, ScanBarcode } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNavigate } from 'react-router-dom'
+import { ScannerDialog } from '@/components/ScannerDialog'
 
 export default function QuickUsage() {
   const { user } = useAuth()
@@ -39,6 +40,7 @@ export default function QuickUsage() {
 
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -145,6 +147,23 @@ export default function QuickUsage() {
     )
   }
 
+  const handleScan = (text: string) => {
+    const matchedBatch = batches.find((b) => b.batch_number === text)
+    if (matchedBatch) {
+      setSelectedMaterial(matchedBatch.material_id)
+      setTimeout(() => setSelectedBatch(matchedBatch.id), 100)
+      toast({ title: 'Lote encontrado' })
+      return
+    }
+    const matchedMat = materials.find((m) => m.barcode === text || m.id === text)
+    if (matchedMat) {
+      setSelectedMaterial(matchedMat.id)
+      toast({ title: 'Material encontrado' })
+      return
+    }
+    toast({ title: 'Código não reconhecido', variant: 'destructive' })
+  }
+
   return (
     <div className="max-w-md mx-auto py-4 sm:py-8 space-y-6">
       <div className="flex items-center gap-3 mb-6">
@@ -161,7 +180,12 @@ export default function QuickUsage() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
-            <Label className="text-base font-semibold">Material</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Material / Lote</Label>
+              <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+                <ScanBarcode className="w-4 h-4 mr-2" /> Escanear
+              </Button>
+            </div>
             <Select value={selectedMaterial} onValueChange={setSelectedMaterial}>
               <SelectTrigger className="h-12 text-base">
                 <SelectValue placeholder="Selecione o material" />
@@ -242,6 +266,8 @@ export default function QuickUsage() {
           </Button>
         </CardFooter>
       </Card>
+
+      <ScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />
     </div>
   )
 }

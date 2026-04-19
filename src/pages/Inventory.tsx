@@ -45,6 +45,8 @@ import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Switch } from '@/components/ui/switch'
+import { ScannerDialog } from '@/components/ScannerDialog'
+import { ScanBarcode } from 'lucide-react'
 
 export default function Inventory() {
   const { toast } = useToast()
@@ -113,7 +115,10 @@ export default function Inventory() {
     min_quantity: '',
     unit: 'un',
     is_high_cost: false,
+    barcode: '',
   })
+  
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   const [countModalOpen, setCountModalOpen] = useState(false)
   const [countForm, setCountForm] = useState({
@@ -157,6 +162,7 @@ export default function Inventory() {
         min_quantity: parseFloat(formData.min_quantity),
         unit: formData.unit,
         is_high_cost: formData.is_high_cost,
+        barcode: formData.barcode,
         current_quantity: editingId ? undefined : 0,
       }
 
@@ -170,7 +176,7 @@ export default function Inventory() {
 
       setIsOpen(false)
       setEditingId(null)
-      setFormData({ name: '', min_quantity: '', unit: 'un', is_high_cost: false })
+      setFormData({ name: '', min_quantity: '', unit: 'un', is_high_cost: false, barcode: '' })
     } catch (err) {
       setFieldErrors(extractFieldErrors(err))
     } finally {
@@ -220,6 +226,7 @@ export default function Inventory() {
       min_quantity: item.min_quantity.toString(),
       unit: item.unit,
       is_high_cost: !!item.is_high_cost,
+      barcode: item.barcode || '',
     })
     setIsOpen(true)
   }
@@ -305,6 +312,14 @@ export default function Inventory() {
                   {fieldErrors.name && (
                     <span className="text-xs text-destructive">{fieldErrors.name}</span>
                   )}
+                </div>
+                <div className="grid gap-2">
+                  <Label>Código de Barras (Opcional)</Label>
+                  <Input
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    placeholder="Escaneie ou digite"
+                  />
                 </div>
                 <div className="flex items-center space-x-2 pt-2 pb-2">
                   <Switch
@@ -665,7 +680,12 @@ export default function Inventory() {
           </DialogHeader>
           <form onSubmit={handleSaveCount} className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label>Material</Label>
+              <div className="flex items-center justify-between">
+                <Label>Material</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+                  <ScanBarcode className="w-4 h-4 mr-2" /> Escanear
+                </Button>
+              </div>
               <Select
                 value={countForm.material_id}
                 onValueChange={(v) =>
@@ -723,6 +743,24 @@ export default function Inventory() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onScan={(text) => {
+          const matched = items.find((m) => m.barcode === text || m.id === text)
+          if (matched) {
+            setCountForm({
+              ...countForm,
+              material_id: matched.id,
+              actual_quantity: matched.current_quantity?.toString() || '0',
+            })
+            toast({ title: 'Material encontrado', description: matched.name })
+          } else {
+            toast({ title: 'Material não encontrado', variant: 'destructive' })
+          }
+        }}
+      />
     </div>
   )
 }
