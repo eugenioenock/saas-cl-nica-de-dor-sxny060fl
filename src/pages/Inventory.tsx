@@ -241,7 +241,7 @@ export default function Inventory() {
       const order = await pb.collection('purchase_orders').create({
         material_id: suggestion.id,
         quantity: suggestion.suggestedQty,
-        status: 'draft',
+        status: 'pending_approval',
         clinic_id: activeClinic?.id,
       })
 
@@ -252,7 +252,7 @@ export default function Inventory() {
         details: { suggestedQty: suggestion.suggestedQty, avgDaily: suggestion.avgDaily },
         clinic_id: activeClinic?.id,
       })
-      toast({ title: 'Pedido de reposição (Rascunho) gerado com sucesso!' })
+      toast({ title: 'Pedido de reposição enviado para aprovação com sucesso!' })
     } catch (e) {
       toast({ title: 'Erro ao gerar pedido', variant: 'destructive' })
     }

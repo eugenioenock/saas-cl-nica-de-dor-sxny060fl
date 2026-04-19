@@ -16,7 +16,13 @@ const chartConfig = {
 export function ManagerPortal() {
   const { activeClinic } = useAppContext()
   const [loading, setLoading] = useState(true)
-  const [metrics, setMetrics] = useState({ revenue: 0, appointments: 0, avgRating: 0 })
+  const [metrics, setMetrics] = useState({
+    revenue: 0,
+    appointments: 0,
+    avgRating: 0,
+    momRevenuePercent: 0,
+    momRevenueTrend: 'neutral',
+  })
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [chartData, setChartData] = useState<any[]>([])
 
@@ -27,7 +33,11 @@ export function ManagerPortal() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const dateStr = thirtyDaysAgo.toISOString().replace('T', ' ').substring(0, 19)
 
-      const [finances, appts, feedbacks, news] = await Promise.all([
+      const sixtyDaysAgo = new Date()
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+      const date60Str = sixtyDaysAgo.toISOString().replace('T', ' ').substring(0, 19)
+
+      const [finances, appts, feedbacks, news, oldFinances] = await Promise.all([
         pb.collection('consultations_finance').getFullList({
           filter: `clinic_id = "${activeClinic.id}" && status = 'paid' && created >= "${dateStr}"`,
         }),
@@ -41,14 +51,35 @@ export function ManagerPortal() {
           filter: `clinic_id = "" || clinic_id = "${activeClinic.id}"`,
           sort: '-created',
         }),
+        pb.collection('consultations_finance').getFullList({
+          filter: `clinic_id = "${activeClinic.id}" && status = 'paid' && created >= "${date60Str}" && created < "${dateStr}"`,
+        }),
       ])
 
       const revenue = finances.reduce((sum, f) => sum + f.amount, 0)
+      const oldRevenue = oldFinances.reduce((sum, f) => sum + f.amount, 0)
+      let momRevenuePercent = 0
+      let momRevenueTrend = 'neutral'
+
+      if (oldRevenue > 0) {
+        momRevenuePercent = ((revenue - oldRevenue) / oldRevenue) * 100
+        momRevenueTrend = momRevenuePercent > 0 ? 'up' : momRevenuePercent < 0 ? 'down' : 'neutral'
+      } else if (revenue > 0) {
+        momRevenuePercent = 100
+        momRevenueTrend = 'up'
+      }
+
       const avgRating = feedbacks.length
         ? feedbacks.reduce((sum, f) => sum + f.rating, 0) / feedbacks.length
         : 0
 
-      setMetrics({ revenue, appointments: appts.length, avgRating })
+      setMetrics({
+        revenue,
+        appointments: appts.length,
+        avgRating,
+        momRevenuePercent,
+        momRevenueTrend,
+      })
       setAnnouncements(news)
 
       const days = [...Array(7)]
@@ -96,7 +127,7 @@ export function ManagerPortal() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receita (30 dias)</CardTitle>
@@ -110,7 +141,37 @@ export function ManagerPortal() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Atendimentos (30 dias)</CardTitle>
+            <CardTitle className="text-sm font-medium">Tendência (MoM)</CardTitle>
+            {metrics.momRevenueTrend === 'up' ? (
+              <Badge
+                variant="default"
+                className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200"
+              >
+                +{metrics.momRevenuePercent.toFixed(1)}%
+              </Badge>
+            ) : metrics.momRevenueTrend === 'down' ? (
+              <Badge
+                variant="destructive"
+                className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200"
+              >
+                {metrics.momRevenuePercent.toFixed(1)}%
+              </Badge>
+            ) : (
+              <Badge
+                variant="secondary"
+                className="bg-gray-100 text-gray-800 hover:bg-gray-100 border-gray-200"
+              >
+                0%
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground mt-4">Comparado aos 30 dias anteriores</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Atendimentos</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

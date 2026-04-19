@@ -66,13 +66,11 @@ export default function FranchiseDashboard() {
         pb.collection('clinic_settings').getFullList(),
         pb.collection('consultations_finance').getFullList({ filter: `status = 'paid'` }),
         pb.collection('appointments').getFullList(),
-        pb
-          .collection('action_logs')
-          .getFullList({
-            filter: `action = 'performance_alert'`,
-            sort: '-created',
-            expand: 'clinic_id',
-          }),
+        pb.collection('action_logs').getFullList({
+          filter: `action = 'performance_alert'`,
+          sort: '-created',
+          expand: 'clinic_id',
+        }),
       ])
       setClinicsList(clinics)
       setAlerts(logs)

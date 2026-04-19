@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T17:35:45.008Z",
+  "generatedAt": "2026-04-19T17:40:53.072Z",
   "collections": [
     {
       "name": "users",
@@ -1005,7 +1005,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["draft", "ordered", "received", "cancelled"]
+          "selectValues": [
+            "draft",
+            "pending_approval",
+            "approved",
+            "ordered",
+            "received",
+            "cancelled"
+          ]
         },
         {
           "name": "supplier",

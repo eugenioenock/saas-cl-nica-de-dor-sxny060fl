@@ -145,6 +145,8 @@ export default function Orders() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="draft">Rascunho</SelectItem>
+              <SelectItem value="pending_approval">Pendente Aprovação</SelectItem>
+              <SelectItem value="approved">Aprovado</SelectItem>
               <SelectItem value="ordered">Solicitado</SelectItem>
               <SelectItem value="received">Recebido</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
@@ -189,12 +191,23 @@ export default function Orders() {
                             ? 'default'
                             : order.status === 'ordered'
                               ? 'secondary'
-                              : order.status === 'cancelled'
-                                ? 'destructive'
-                                : 'outline'
+                              : order.status === 'approved'
+                                ? 'default'
+                                : order.status === 'cancelled'
+                                  ? 'destructive'
+                                  : order.status === 'pending_approval'
+                                    ? 'destructive'
+                                    : 'outline'
+                        }
+                        className={
+                          order.status === 'pending_approval'
+                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                            : ''
                         }
                       >
                         {order.status === 'draft' && 'Rascunho'}
+                        {order.status === 'pending_approval' && 'Pendente Aprovação'}
+                        {order.status === 'approved' && 'Aprovado'}
                         {order.status === 'ordered' && 'Solicitado'}
                         {order.status === 'received' && 'Recebido'}
                         {order.status === 'cancelled' && 'Cancelado'}
@@ -205,6 +218,46 @@ export default function Orders() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => updateStatus(order.id, 'pending_approval')}
+                        >
+                          Enviar Aprovação
+                        </Button>
+                      )}
+                      {order.status === 'pending_approval' && (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => {
+                              const reason = window.prompt('Motivo da rejeição (opcional):')
+                              if (reason !== null) {
+                                updateStatus(order.id, 'cancelled')
+                                if (reason) {
+                                  pb.collection('action_logs')
+                                    .create({
+                                      action: 'reject_order',
+                                      collection_name: 'purchase_orders',
+                                      record_id: order.id,
+                                      details: { reason },
+                                      clinic_id: activeClinic?.id,
+                                    })
+                                    .catch(console.error)
+                                }
+                              }
+                            }}
+                          >
+                            Rejeitar
+                          </Button>
+                          <Button size="sm" onClick={() => updateStatus(order.id, 'approved')}>
+                            Aprovar
+                          </Button>
+                        </div>
+                      )}
+                      {order.status === 'approved' && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() => updateStatus(order.id, 'ordered')}
                         >
                           Marcar Solicitado
