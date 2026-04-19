@@ -53,6 +53,7 @@ import { Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Command,
   CommandEmpty,
@@ -398,9 +399,27 @@ export default function PatientRecord() {
             <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
                 <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
-                {canEditPositions && data.points.length > 0 && (
+                {canEditPositions && (
                   <div className="flex gap-2">
-                    {isAdjusting ? (
+                    {data.points.length === 0 ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div tabIndex={0}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              className="pointer-events-none opacity-50"
+                            >
+                              Ajustar Marcadores
+                            </Button>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : isAdjusting ? (
                       <>
                         <Button size="sm" variant="ghost" onClick={toggleAdjustMode}>
                           Cancelar
