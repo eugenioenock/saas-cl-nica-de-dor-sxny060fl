@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-20T00:03:08.045Z",
+  "generatedAt": "2026-04-20T00:12:37.304Z",
   "collections": [
     {
       "name": "users",
@@ -1487,7 +1487,12 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["consultation_pattern", "inventory_menu", "general_settings"]
+          "selectValues": [
+            "consultation_pattern",
+            "inventory_menu",
+            "general_settings",
+            "anatomical_model"
+          ]
         },
         {
           "name": "config_data",

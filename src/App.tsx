@@ -28,6 +28,8 @@ import SettingsMaintenanceMigration from './pages/SettingsMaintenanceMigration'
 import MatrixDashboard from './pages/MatrixDashboard'
 import PendingApproval from './pages/PendingApproval'
 import UnitsComparison from './pages/UnitsComparison'
+import DeveloperHub from './pages/DeveloperHub'
+import AnatomicalModelEditor from './pages/AnatomicalModelEditor'
 import AuditHistory from './pages/AuditHistory'
 import FranchiseManagement from './pages/FranchiseManagement'
 import FranchiseDashboard from './pages/FranchiseDashboard'
@@ -109,6 +111,8 @@ const App = () => (
                 />
                 <Route path="/admin/franchise/templates" element={<FranchiseTemplates />} />
                 <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
+                <Route path="/admin/developer-hub" element={<DeveloperHub />} />
+                <Route path="/admin/anatomical-model" element={<AnatomicalModelEditor />} />
               </Route>
               <Route path="/pending-approval" element={<PendingApproval />} />
               <Route path="*" element={<NotFound />} />

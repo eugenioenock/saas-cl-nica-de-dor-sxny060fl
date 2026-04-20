@@ -84,6 +84,18 @@ const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolea
     url: '/settings/signature-audit',
     adminOnly: true,
   },
+  {
+    title: 'Modelo Anatômico',
+    icon: Activity,
+    url: '/admin/anatomical-model',
+    adminOnly: false,
+  },
+  {
+    title: 'Developer Hub',
+    icon: Zap,
+    url: '/admin/developer-hub',
+    adminOnly: true,
+  },
 ]
 
 export function AppSidebar() {

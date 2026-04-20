@@ -10,6 +10,7 @@ import {
   Activity,
   Check,
   ChevronsUpDown,
+  RefreshCw,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -67,7 +68,7 @@ import { Package } from 'lucide-react'
 import React from 'react'
 import bodyImage from '@/assets/corpo-humano-a2474.jpg'
 
-const ANATOMY_REGIONS = [
+const DEFAULT_ANATOMY_REGIONS = [
   { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 15, w: 10, h: 8 },
   { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 12, h: 14 },
   { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 44, w: 14, h: 12 },
@@ -105,6 +106,7 @@ export default function PatientRecord() {
     catalog: [],
     usages: [],
     actionLogs: [],
+    anatomyRegions: DEFAULT_ANATOMY_REGIONS,
   })
   const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [users, setUsers] = useState<any[]>([])
@@ -231,6 +233,31 @@ export default function PatientRecord() {
     return 'bg-green-500 hover:bg-green-600 text-white'
   }
 
+  const [isSyncing, setIsSyncing] = useState(false)
+  const handleSyncPoints = async () => {
+    setIsSyncing(true)
+    try {
+      let syncedCount = 0
+      for (const pt of data.points) {
+        const masterRegion = data.anatomyRegions.find((r: any) => r.name === pt.name)
+        if (masterRegion && (pt.x !== masterRegion.x || pt.y !== masterRegion.y)) {
+          await pb.collection('pain_points').update(pt.id, { x: masterRegion.x, y: masterRegion.y })
+          syncedCount++
+        }
+      }
+
+      if (syncedCount > 0) {
+        toast.success(`${syncedCount} marcadores sincronizados com o modelo mestre!`)
+      } else {
+        toast.info('Todos os marcadores já estão sincronizados com o modelo mestre.')
+      }
+    } catch (e) {
+      toast.error('Erro ao sincronizar marcadores')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   const handleRegionClick = async (region: any, existingPoint: any) => {
     if (existingPoint) {
       if (existingPoint.notes || existingPoint.pathologies?.length > 0) {
@@ -304,7 +331,17 @@ export default function PatientRecord() {
             expand: 'user_id',
           })
           .catch(() => []),
+        pb
+          .collection('clinic_templates')
+          .getFullList({ filter: 'type="anatomical_model"' })
+          .catch(() => []),
       ])
+
+      let anatomyRegions = DEFAULT_ANATOMY_REGIONS
+      if (templatesRes && templatesRes.length > 0 && templatesRes[0].config_data?.points) {
+        anatomyRegions = templatesRes[0].config_data.points
+      }
+
       setData({
         patient,
         points,
@@ -312,6 +349,7 @@ export default function PatientRecord() {
         catalog: catalog.map((c) => c.name),
         usages: usagesRes,
         actionLogs: actionLogsRes,
+        anatomyRegions,
       })
       setUsers(usersRes)
       setInventoryItems(inventoryRes)
@@ -500,6 +538,23 @@ export default function PatientRecord() {
               <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
                 <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
                 <div className="flex gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleSyncPoints}
+                        disabled={isSyncing || isAdjusting}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Sincronizar posições com o Modelo Master</TooltipContent>
+                  </Tooltip>
                   {data.points.length === 0 ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -520,8 +575,7 @@ export default function PatientRecord() {
                     </Tooltip>
                   ) : isLockedByOther() ? (
                     <Button size="sm" variant="outline" disabled className="opacity-80">
-                      Este mapa está sendo editado por{' '}
-                      {data.patient?.expand?.locked_by?.name || 'outro usuário'}
+                      Sendo editado por {data.patient?.expand?.locked_by?.name || 'outro'}
                     </Button>
                   ) : isAdjusting ? (
                     <>
@@ -535,7 +589,7 @@ export default function PatientRecord() {
                       </Button>
                       <Button size="sm" onClick={saveAdjustments} disabled={isSavingAdjustments}>
                         {isSavingAdjustments && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        {isSavingAdjustments ? 'Salvando...' : 'Concluir Ajustes'}
+                        {isSavingAdjustments ? 'Salvando...' : 'Concluir'}
                       </Button>
                     </>
                   ) : (
@@ -565,7 +619,7 @@ export default function PatientRecord() {
                   />
 
                   {!isAdjusting &&
-                    ANATOMY_REGIONS.map((region) => {
+                    data.anatomyRegions.map((region: any) => {
                       const isActive = data.points.some((p: any) => p.name === region.name)
                       if (isActive) return null
 
@@ -588,7 +642,7 @@ export default function PatientRecord() {
                     })}
 
                   {(isAdjusting ? draftPoints : data.points).map((pt: any) => {
-                    const region = ANATOMY_REGIONS.find((r) => r.name === pt.name)
+                    const region = data.anatomyRegions.find((r: any) => r.name === pt.name)
                     const w = region ? region.w : 10
                     const h = region ? region.h : 10
                     const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)

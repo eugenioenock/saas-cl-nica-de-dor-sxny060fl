@@ -21,7 +21,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import bodyImage from '@/assets/corpo-humano-a2474.jpg'
 
-const ANATOMY_REGIONS = [
+const DEFAULT_ANATOMY_REGIONS = [
   { id: 'cervical', name: 'Coluna Cervical', view: 'back', x: 50, y: 15, w: 10, h: 8 },
   { id: 'toracica', name: 'Coluna Torácica', view: 'back', x: 50, y: 28, w: 12, h: 14 },
   { id: 'lombar', name: 'Coluna Lombar', view: 'back', x: 50, y: 44, w: 14, h: 12 },
@@ -46,6 +46,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
   const [loading, setLoading] = useState(true)
   const [catalog, setCatalog] = useState<string[]>([])
   const [openComboboxId, setOpenComboboxId] = useState<string | null>(null)
+  const [anatomyRegions, setAnatomyRegions] = useState<any[]>(DEFAULT_ANATOMY_REGIONS)
 
   const loadPoints = async () => {
     try {
@@ -65,6 +66,15 @@ export function BodyMap({ patientId }: { patientId: string }) {
     pb.collection('pathologies_catalog')
       .getFullList({ sort: 'name' })
       .then((res) => setCatalog(res.map((c) => c.name)))
+      .catch(console.error)
+
+    pb.collection('clinic_templates')
+      .getFullList({ filter: 'type="anatomical_model"' })
+      .then((res) => {
+        if (res.length > 0 && res[0].config_data?.points) {
+          setAnatomyRegions(res[0].config_data.points)
+        }
+      })
       .catch(console.error)
   }, [patientId])
 
@@ -185,7 +195,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
               }}
             />
 
-            {ANATOMY_REGIONS.map((region) => {
+            {anatomyRegions.map((region: any) => {
               const isActive = points.some((p: any) => p.name === region.name)
               if (isActive) return null
 
@@ -209,7 +219,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
             })}
 
             {points.map((pt: any) => {
-              const region = ANATOMY_REGIONS.find((r) => r.name === pt.name)
+              const region = anatomyRegions.find((r: any) => r.name === pt.name)
               const w = region ? region.w : 10
               const h = region ? region.h : 10
               const isHovered = hoveredPointId === pt.id
