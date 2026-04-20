@@ -151,11 +151,13 @@ export default function PatientRecord() {
       for (const draft of draftPoints) {
         const original = data.points.find((p: any) => p.id === draft.id)
         if (original && (original.x !== draft.x || original.y !== draft.y)) {
-          await pb.collection('pain_points').update(draft.id, { x: draft.x, y: draft.y })
+          const updatedRecord = await pb
+            .collection('pain_points')
+            .update(draft.id, { x: draft.x, y: draft.y })
           hasChanges = true
           const idx = updatedLocalPoints.findIndex((p) => p.id === draft.id)
           if (idx !== -1) {
-            updatedLocalPoints[idx] = { ...updatedLocalPoints[idx], x: draft.x, y: draft.y }
+            updatedLocalPoints[idx] = updatedRecord
           }
         }
       }
@@ -169,6 +171,7 @@ export default function PatientRecord() {
       setDraftPoints([])
       setDraggingPointId(null)
     } catch (err) {
+      console.error('Erro ao salvar ajustes:', err)
       toast.error('Erro ao salvar posições. Tente novamente.')
     } finally {
       setIsSavingAdjustments(false)
@@ -444,7 +447,7 @@ export default function PatientRecord() {
                       </Button>
                       <Button size="sm" onClick={saveAdjustments} disabled={isSavingAdjustments}>
                         {isSavingAdjustments && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Concluir Ajustes
+                        {isSavingAdjustments ? 'Salvando...' : 'Concluir Ajustes'}
                       </Button>
                     </>
                   ) : (
