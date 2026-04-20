@@ -50,6 +50,7 @@ const routeMap: Record<string, string> = {
   reports: 'Relatórios',
   settings: 'Configurações',
   portal: 'Meu Portal',
+  manual: 'Manual do Sistema',
 }
 
 export function AppHeader() {

@@ -16,6 +16,7 @@ import {
   FileText,
   ArrowRightLeft,
   PenLine,
+  BookOpen,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -45,6 +46,7 @@ const adminNavItems = [
   { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
   { title: 'Relatórios', icon: BarChart3, url: '/reports' },
   { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
+  { title: 'Manual', icon: BookOpen, url: '/manual' },
 ]
 
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
@@ -98,10 +100,11 @@ export function AppSidebar() {
             '/records',
             '/reports',
             '/professional/finance',
+            '/manual',
           ].includes(item.url)
         }
         if (user?.role === 'receptionist') {
-          return ['/dashboard', '/agenda', '/pacientes'].includes(item.url)
+          return ['/dashboard', '/agenda', '/pacientes', '/manual'].includes(item.url)
         }
         return false
       })

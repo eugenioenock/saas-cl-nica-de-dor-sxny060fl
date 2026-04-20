@@ -38,6 +38,7 @@ import FranchiseTransfers from './pages/FranchiseTransfers'
 import ProfessionalFinance from './pages/ProfessionalFinance'
 import SignatureAudit from './pages/SignatureAudit'
 import Suppliers from './pages/Suppliers'
+import Manual from './pages/Manual'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -113,6 +114,7 @@ const App = () => (
                 <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
                 <Route path="/admin/developer-hub" element={<DeveloperHub />} />
                 <Route path="/admin/anatomical-model" element={<AnatomicalModelEditor />} />
+                <Route path="/manual" element={<Manual />} />
               </Route>
               <Route path="/pending-approval" element={<PendingApproval />} />
               <Route path="*" element={<NotFound />} />
