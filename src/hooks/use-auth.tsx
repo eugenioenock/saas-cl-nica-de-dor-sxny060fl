@@ -53,7 +53,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           method: 'POST',
           body: JSON.stringify({ email }),
         })
-      } catch (_) {}
+      } catch (_) {
+        // ignore error
+      }
       return { error }
     }
   }
