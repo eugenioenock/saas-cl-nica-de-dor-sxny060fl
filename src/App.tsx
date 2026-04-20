@@ -133,14 +133,4 @@ const App = () => (
                 <Route path="/admin/logs" element={<AccessLogs />} />
                 <Route path="/manual" element={<Manual />} />
               </Route>
-              <Route path="/pending-approval" element={<PendingApproval />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </TooltipProvider>
-        </AppProvider>
-      </ThemeProvider>
-    </AuthProvider>
-  </BrowserRouter>
-)
-
-export default App
+              <Route path="/pending-approval" element={<PendingApproval />} 
