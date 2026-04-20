@@ -67,7 +67,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const RouteDispatcher = () => {
   const { user } = useAuth()
-  if (user?.role === 'patient' || user?.role === 'manager') return <Navigate to="/portal" replace />
+  if (user?.role === 'patient') return <Navigate to="/portal" replace />
   return <Navigate to="/dashboard" replace />
 }
 

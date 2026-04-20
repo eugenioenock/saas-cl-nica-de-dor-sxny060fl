@@ -47,7 +47,14 @@ export default function Login() {
       .catch(console.error)
   }, [])
 
-  if (loading) return null
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   if (user) return <Navigate to="/dashboard" replace />
 
   const onSubmit = async (data: LoginFormValues) => {

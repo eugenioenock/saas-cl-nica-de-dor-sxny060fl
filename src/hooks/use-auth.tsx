@@ -18,7 +18,7 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any>(pb.authStore.record)
+  const [user, setUser] = useState<any>(pb.authStore.isValid ? pb.authStore.record : null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,19 +29,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (pb.authStore.isValid) {
           // Verify session validity with backend
           await pb.collection('users').authRefresh()
+        } else {
+          pb.authStore.clear()
         }
       } catch (error) {
         // If the token is invalid or expired, clear the auth store
         pb.authStore.clear()
       } finally {
-        if (isMounted) setLoading(false)
+        if (isMounted) {
+          setUser(pb.authStore.isValid ? pb.authStore.record : null)
+          setLoading(false)
+        }
       }
     }
 
     initAuth()
 
     const unsubscribe = pb.authStore.onChange((_token, record) => {
-      setUser(record)
+      setUser(pb.authStore.isValid ? record : null)
     })
 
     return () => {
