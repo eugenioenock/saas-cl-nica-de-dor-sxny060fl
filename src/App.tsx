@@ -39,6 +39,10 @@ import ProfessionalFinance from './pages/ProfessionalFinance'
 import SignatureAudit from './pages/SignatureAudit'
 import Suppliers from './pages/Suppliers'
 import Manual from './pages/Manual'
+import UsersManagement from './pages/UsersManagement'
+import AccessLogs from './pages/AccessLogs'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -68,6 +72,8 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 element={
                   <ProtectedRoute>
@@ -114,6 +120,8 @@ const App = () => (
                 <Route path="/admin/franchise/transfers" element={<FranchiseTransfers />} />
                 <Route path="/admin/developer-hub" element={<DeveloperHub />} />
                 <Route path="/admin/anatomical-model" element={<AnatomicalModelEditor />} />
+                <Route path="/admin/users" element={<UsersManagement />} />
+                <Route path="/admin/logs" element={<AccessLogs />} />
                 <Route path="/manual" element={<Manual />} />
               </Route>
               <Route path="/pending-approval" element={<PendingApproval />} />

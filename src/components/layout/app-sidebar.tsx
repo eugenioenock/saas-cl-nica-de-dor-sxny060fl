@@ -51,7 +51,27 @@ const adminNavItems = [
 
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
 
-const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
+const settingsItems: {
+  title: string
+  icon: any
+  url: string
+  adminOnly?: boolean
+  managerAllowed?: boolean
+}[] = [
+  {
+    title: 'Gestão de Usuários',
+    icon: Users,
+    url: '/admin/users',
+    adminOnly: true,
+    managerAllowed: true,
+  },
+  {
+    title: 'Logs de Acesso',
+    icon: ShieldPlus,
+    url: '/admin/logs',
+    adminOnly: true,
+    managerAllowed: true,
+  },
   { title: 'Configurações Gerais', icon: Settings, url: '/settings' },
   { title: 'Franquia - Unidades', icon: Building2, url: '/admin/franchise', adminOnly: true },
   { title: 'Franquia - Dashboard', icon: BarChart3, url: '/franchise-dashboard', adminOnly: true },
@@ -165,7 +185,12 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {settingsItems.map((item) => {
-                  if (item.adminOnly && user?.role !== 'admin') return null
+                  if (
+                    item.adminOnly &&
+                    user?.role !== 'admin' &&
+                    !(item.managerAllowed && user?.role === 'manager')
+                  )
+                    return null
                   const isActive = location.pathname === item.url
                   return (
                     <SidebarMenuItem key={item.title}>

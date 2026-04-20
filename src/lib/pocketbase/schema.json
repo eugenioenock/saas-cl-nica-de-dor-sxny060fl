@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-20T00:58:33.869Z",
+  "generatedAt": "2026-04-20T01:04:28.793Z",
   "collections": [
     {
       "name": "users",
@@ -7,9 +7,9 @@
       "apiRules": {
         "list": "id = @request.auth.id || clinic_id = @request.auth.clinic_id || @request.auth.role = 'admin'",
         "view": "id = @request.auth.id || clinic_id = @request.auth.clinic_id || @request.auth.role = 'admin'",
-        "create": "",
-        "update": "id = @request.auth.id",
-        "delete": "id = @request.auth.id"
+        "create": "@request.auth.id = '' || (clinic_id = @request.auth.clinic_id && (@request.auth.role = 'admin' || @request.auth.role = 'manager'))",
+        "update": "id = @request.auth.id || (clinic_id = @request.auth.clinic_id && (@request.auth.role = 'admin' || @request.auth.role = 'manager'))",
+        "delete": "id = @request.auth.id || (clinic_id = @request.auth.clinic_id && (@request.auth.role = 'admin' || @request.auth.role = 'manager'))"
       },
       "fields": [
         {
