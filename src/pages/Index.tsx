@@ -359,7 +359,15 @@ export default function Index() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-4 md:pt-8">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Dashboard
+            {role === 'admin'
+              ? 'Painel Administrativo'
+              : role === 'manager'
+                ? 'Gestão da Clínica'
+                : role === 'professional'
+                  ? 'Meu Consultório'
+                  : role === 'receptionist'
+                    ? 'Recepção'
+                    : 'Dashboard'}
           </h1>
           <p className="text-muted-foreground text-sm md:text-base">
             Bem-vindo de volta, <span className="font-semibold text-foreground">{user?.name}</span>.

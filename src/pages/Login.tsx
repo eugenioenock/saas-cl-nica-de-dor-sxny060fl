@@ -55,7 +55,19 @@ export default function Login() {
     )
   }
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) {
+    const dashUrl =
+      user.role === 'admin'
+        ? '/admin/dashboard'
+        : user.role === 'manager'
+          ? '/manager/dashboard'
+          : user.role === 'professional'
+            ? '/professional/dashboard'
+            : user.role === 'receptionist'
+              ? '/reception/dashboard'
+              : '/portal'
+    return <Navigate to={dashUrl} replace />
+  }
 
   const onSubmit = async (data: LoginFormValues) => {
     const res = await signIn(data.email, data.password)

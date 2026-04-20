@@ -32,23 +32,6 @@ import {
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/hooks/use-auth'
 
-const adminNavItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
-  { title: 'Agenda', icon: CalendarDays, url: '/agenda' },
-  { title: 'Pacientes', icon: Users, url: '/pacientes' },
-  { title: 'Prontuários', icon: Activity, url: '/records' },
-  { title: 'Estoque', icon: Package, url: '/inventory' },
-  { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
-  { title: 'Fornecedores', icon: Building2, url: '/inventory/suppliers' },
-  { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
-  { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
-  { title: 'Meu Financeiro', icon: DollarSign, url: '/professional/finance' },
-  { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
-  { title: 'Relatórios', icon: BarChart3, url: '/reports' },
-  { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
-  { title: 'Manual', icon: BookOpen, url: '/manual' },
-]
-
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
 
 const settingsItems: {
@@ -106,6 +89,34 @@ export function AppSidebar() {
   const location = useLocation()
   const { user } = useAuth()
   const isPatient = user?.role === 'patient'
+
+  const getDashUrl = () => {
+    if (user?.role === 'admin') return '/admin/dashboard'
+    if (user?.role === 'manager') return '/manager/dashboard'
+    if (user?.role === 'professional') return '/professional/dashboard'
+    if (user?.role === 'receptionist') return '/reception/dashboard'
+    return '/portal'
+  }
+
+  const dashUrl = getDashUrl()
+
+  const adminNavItems = [
+    { title: 'Dashboard', icon: LayoutDashboard, url: dashUrl },
+    { title: 'Agenda', icon: CalendarDays, url: '/agenda' },
+    { title: 'Pacientes', icon: Users, url: '/pacientes' },
+    { title: 'Prontuários', icon: Activity, url: '/records' },
+    { title: 'Estoque', icon: Package, url: '/inventory' },
+    { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
+    { title: 'Fornecedores', icon: Building2, url: '/inventory/suppliers' },
+    { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
+    { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
+    { title: 'Meu Financeiro', icon: DollarSign, url: '/professional/finance' },
+    { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
+    { title: 'Relatórios', icon: BarChart3, url: '/reports' },
+    { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
+    { title: 'Manual', icon: BookOpen, url: '/manual' },
+  ]
+
   const navItems = isPatient
     ? patientNavItems
     : adminNavItems.filter((item) => {
@@ -114,7 +125,7 @@ export function AppSidebar() {
         }
         if (user?.role === 'professional') {
           return [
-            '/dashboard',
+            dashUrl,
             '/agenda',
             '/pacientes',
             '/records',
@@ -124,7 +135,7 @@ export function AppSidebar() {
           ].includes(item.url)
         }
         if (user?.role === 'receptionist') {
-          return ['/dashboard', '/agenda', '/pacientes', '/manual'].includes(item.url)
+          return [dashUrl, '/agenda', '/pacientes', '/manual'].includes(item.url)
         }
         return false
       })
