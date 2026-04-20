@@ -3,17 +3,40 @@ import { useAuth } from '@/hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Activity } from 'lucide-react'
+import { Activity, Loader2 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
+import { useToast } from '@/hooks/use-toast'
+import { z } from 'zod'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+
+const loginSchema = z.object({
+  email: z.string().min(1, 'Email é obrigatório').email('Formato de e-mail inválido'),
+  password: z.string().min(1, 'Senha é obrigatória'),
+})
+
+type LoginFormValues = z.infer<typeof loginSchema>
 
 export default function Login() {
   const { signIn, user, loading } = useAuth()
-  const [email, setEmail] = useState('admin@skip.com')
-  const [password, setPassword] = useState('Skip@Pass')
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
   const [settings, setSettings] = useState<any>(null)
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: 'admin@skip.com',
+      password: 'Skip@Pass',
+    },
+  })
 
   useEffect(() => {
     pb.collection('clinic_settings')
@@ -27,15 +50,15 @@ export default function Login() {
   if (loading) return null
   if (user) return <Navigate to="/dashboard" replace />
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError('')
-    const res = await signIn(email, password)
+  const onSubmit = async (data: LoginFormValues) => {
+    const res = await signIn(data.email, data.password)
     if (res.error) {
-      setError('Credenciais inválidas.')
+      toast({
+        variant: 'destructive',
+        title: 'Erro de Autenticação',
+        description: 'Login failed. Please check your email and password.',
+      })
     }
-    setIsSubmitting(false)
   }
 
   return (
@@ -93,46 +116,60 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-8">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail Profissional</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="dr.nome@spinecare.com"
-                  required
-                  className="h-12"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-8">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail Profissional</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="dr.nome@spinecare.com"
+                          className="h-12"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Senha</FormLabel>
+                      </div>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" className="h-12" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Senha</Label>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="h-12"
-                />
-              </div>
-            </div>
 
-            {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-
-            <Button
-              type="submit"
-              className="w-full h-12 text-base font-semibold"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Autenticando...' : 'Entrar'}
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-semibold"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Autenticando...
+                  </>
+                ) : (
+                  'Entrar'
+                )}
+              </Button>
+            </form>
+          </Form>
         </div>
       </div>
     </div>
