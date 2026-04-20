@@ -35,6 +35,7 @@ import { useDebounce } from '@/hooks/use-debounce'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 
 const routeMap: Record<string, string> = {
   dashboard: 'Dashboard',
