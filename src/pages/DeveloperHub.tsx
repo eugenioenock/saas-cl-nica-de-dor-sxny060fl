@@ -23,10 +23,6 @@ export default function DeveloperHub() {
   const [reportLogs, setReportLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -46,6 +42,10 @@ export default function DeveloperHub() {
     }
     loadData()
   }, [])
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />
+  }
 
   if (loading) {
     return (

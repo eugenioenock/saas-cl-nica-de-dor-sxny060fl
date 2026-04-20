@@ -36,10 +36,6 @@ export default function AnatomicalModelEditor() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
 
-  if (user?.role !== 'admin' && user?.role !== 'manager') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   useEffect(() => {
     const loadTemplate = async () => {
       try {
@@ -83,6 +79,10 @@ export default function AnatomicalModelEditor() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (user?.role !== 'admin' && user?.role !== 'manager') {
+    return <Navigate to="/dashboard" replace />
   }
 
   if (loading) {
