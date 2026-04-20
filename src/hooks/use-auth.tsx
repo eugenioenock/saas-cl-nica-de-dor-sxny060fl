@@ -48,6 +48,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await pb.collection('users').authWithPassword(email, password)
       return { error: null }
     } catch (error) {
+      try {
+        await pb.send('/backend/v1/auth/failed', {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        })
+      } catch (_) {}
       return { error }
     }
   }

@@ -15,7 +15,10 @@ import {
   Package,
   ShieldCheck,
   Settings2,
+  AlertTriangle,
 } from 'lucide-react'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { useRealtime } from '@/hooks/use-realtime'
 import { ProfessionalRanking } from '@/components/dashboard/ProfessionalRanking'
 import { PerformanceInsights } from '@/components/dashboard/performance-insights'
 import { ClinicGamificationWidget } from '@/components/dashboard/ClinicGamificationWidget'
@@ -59,6 +62,7 @@ interface DashboardSettings {
 
 export default function Index() {
   const { user } = useAuth()
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([])
   const [data, setData] = useState<DashboardData>({
     appointmentsToday: 0,
     pendingNotes: 0,
@@ -87,6 +91,32 @@ export default function Index() {
   const isManager = role === 'manager' || role === 'admin'
   const isReceptionist = role === 'receptionist'
   const isProfessional = role === 'professional' || role === 'admin'
+
+  useEffect(() => {
+    if (isManager && user?.id) {
+      pb.collection('notifications')
+        .getList(1, 5, {
+          filter: `type = 'system' && is_read = false && user_id = '${user.id}'`,
+          sort: '-created',
+        })
+        .then((res) => setSecurityAlerts(res.items))
+        .catch(console.error)
+    }
+  }, [isManager, user?.id])
+
+  useRealtime('notifications', (e) => {
+    if (
+      isManager &&
+      user?.id &&
+      e.record.type === 'system' &&
+      e.record.is_read === false &&
+      e.record.user_id === user.id
+    ) {
+      if (e.action === 'create') {
+        setSecurityAlerts((prev) => [e.record, ...prev].slice(0, 5))
+      }
+    }
+  })
 
   useEffect(() => {
     if (user?.settings?.dashboard) {
@@ -293,6 +323,39 @@ export default function Index() {
 
   return (
     <div className="space-y-6 animate-fade-in-up pb-8 max-w-7xl mx-auto px-4 md:px-0">
+      {securityAlerts.length > 0 && (
+        <div className="space-y-3 pt-4">
+          {securityAlerts.map((alert) => (
+            <Alert
+              key={alert.id}
+              variant="destructive"
+              className="bg-destructive/10 border-destructive/20 text-destructive animate-fade-in"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>{alert.title}</AlertTitle>
+              <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
+                <span>{alert.message}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 hover:bg-destructive/20 hover:text-destructive w-fit"
+                  onClick={async () => {
+                    try {
+                      await pb.collection('notifications').update(alert.id, { is_read: true })
+                      setSecurityAlerts((prev) => prev.filter((a) => a.id !== alert.id))
+                    } catch (e) {
+                      console.error(e)
+                    }
+                  }}
+                >
+                  Marcar como lido
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-4 md:pt-8">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">

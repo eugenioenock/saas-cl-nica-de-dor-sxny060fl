@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-20T01:04:28.793Z",
+  "generatedAt": "2026-04-20T01:08:03.695Z",
   "collections": [
     {
       "name": "users",
@@ -264,11 +264,11 @@
       "name": "medical_notes",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id",
-        "view": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id",
-        "delete": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id"
+        "list": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id",
+        "view": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id",
+        "create": "@request.auth.id != '' && @request.auth.role != 'receptionist'",
+        "update": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id",
+        "delete": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id"
       },
       "fields": [
         {
@@ -505,11 +505,11 @@
       "name": "consultations_finance",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
-        "delete": "@request.auth.id != '' && clinic_id = @request.auth.clinic_id"
+        "list": "@request.auth.id != '' && @request.auth.role != 'receptionist' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "view": "@request.auth.id != '' && @request.auth.role != 'receptionist' && (@request.auth.role = 'admin' || clinic_id = @request.auth.clinic_id) && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "create": "@request.auth.id != '' && @request.auth.role != 'receptionist' && @request.auth.role != 'patient'",
+        "update": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id && (@request.auth.role != 'patient' || patient_id = @request.auth.patient_id)",
+        "delete": "@request.auth.id != '' && @request.auth.role != 'receptionist' && clinic_id = @request.auth.clinic_id"
       },
       "fields": [
         {

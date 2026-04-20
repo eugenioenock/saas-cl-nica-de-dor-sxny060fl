@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -47,6 +49,19 @@ import { useAppContext } from '@/hooks/use-app-context'
 export default function Financeiro() {
   const { toast } = useToast()
   const { activeClinic } = useAppContext()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (user?.role === 'receptionist') {
+      toast({
+        title: 'Acesso Negado',
+        description: 'Você não tem permissão para acessar o módulo financeiro.',
+        variant: 'destructive',
+      })
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, navigate, toast])
   const [finances, setFinances] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
   const [plans, setPlans] = useState<any[]>([])
