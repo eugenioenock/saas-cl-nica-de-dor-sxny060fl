@@ -22,11 +22,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+
+    const initAuth = async () => {
+      try {
+        if (pb.authStore.isValid) {
+          // Verify session validity with backend
+          await pb.collection('users').authRefresh()
+        }
+      } catch (error) {
+        // If the token is invalid or expired, clear the auth store
+        pb.authStore.clear()
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    initAuth()
+
     const unsubscribe = pb.authStore.onChange((_token, record) => {
       setUser(record)
     })
-    setLoading(false)
+
     return () => {
+      isMounted = false
       unsubscribe()
     }
   }, [])

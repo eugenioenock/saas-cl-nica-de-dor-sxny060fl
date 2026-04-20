@@ -46,10 +46,19 @@ import ResetPassword from './pages/ResetPassword'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate } from 'react-router-dom'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Loader2 } from 'lucide-react'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth()
-  if (loading) return null
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   if (!user) return <Navigate to="/login" replace />
   if (user.status === 'pending' || user.status === 'rejected')
     return <Navigate to="/pending-approval" replace />
