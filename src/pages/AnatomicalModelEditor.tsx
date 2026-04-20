@@ -72,7 +72,7 @@ export default function AnatomicalModelEditor() {
         })
         setTemplate(res)
       }
-      toast.success('Modelo anatômico salvo com sucesso!')
+      toast.success('Master template synchronized successfully')
     } catch (err) {
       toast.error('Erro ao salvar modelo')
       console.error(err)

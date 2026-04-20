@@ -26,10 +26,20 @@ export default function DeveloperHub() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        const logsFilter = user?.role === 'manager' ? `clinic_id="${user.clinic_id}"` : ''
+        const annFilter =
+          user?.role === 'manager' ? `clinic_id="" || clinic_id="${user.clinic_id}"` : ''
+        const reportsFilter =
+          user?.role === 'manager' ? `schedule_id.clinic_id="${user.clinic_id}"` : ''
+
         const [logsRes, annRes, reportsRes] = await Promise.all([
-          pb.collection('action_logs').getList(1, 50, { sort: '-created', expand: 'user_id' }),
-          pb.collection('announcements').getList(1, 50, { sort: '-created' }),
-          pb.collection('report_logs').getList(1, 50, { sort: '-created', expand: 'schedule_id' }),
+          pb
+            .collection('action_logs')
+            .getList(1, 50, { sort: '-created', expand: 'user_id', filter: logsFilter }),
+          pb.collection('announcements').getList(1, 50, { sort: '-created', filter: annFilter }),
+          pb
+            .collection('report_logs')
+            .getList(1, 50, { sort: '-created', expand: 'schedule_id', filter: reportsFilter }),
         ])
         setLogs(logsRes.items)
         setAnnouncements(annRes.items)
@@ -43,8 +53,16 @@ export default function DeveloperHub() {
     loadData()
   }, [])
 
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />
+  if (user?.role !== 'admin' && user?.role !== 'manager') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <h1 className="text-4xl font-bold text-destructive">403</h1>
+        <p className="text-xl font-semibold">Permission Denied</p>
+        <p className="text-muted-foreground">
+          Você não tem permissão para acessar os logs do sistema.
+        </p>
+      </div>
+    )
   }
 
   if (loading) {
