@@ -12,7 +12,6 @@ import {
   ShieldPlus,
   ShoppingCart,
   Zap,
-  Plug,
   Building2,
   FileText,
   ArrowRightLeft,
@@ -24,12 +23,12 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 
 const adminNavItems = [
@@ -51,14 +50,9 @@ const adminNavItems = [
 const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
 
 const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolean }[] = [
-  { title: 'Configurações', icon: Settings, url: '/settings' },
+  { title: 'Configurações Gerais', icon: Settings, url: '/settings' },
   { title: 'Franquia - Unidades', icon: Building2, url: '/admin/franchise', adminOnly: true },
-  {
-    title: 'Franquia - Dashboard',
-    icon: BarChart3,
-    url: '/franchise-dashboard',
-    adminOnly: true,
-  },
+  { title: 'Franquia - Dashboard', icon: BarChart3, url: '/franchise-dashboard', adminOnly: true },
   {
     title: 'Franquia - Templates',
     icon: FileText,
@@ -71,7 +65,6 @@ const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolea
     url: '/admin/franchise/transfers',
     adminOnly: true,
   },
-  { title: 'Integrações', icon: Plug, url: '/settings/integrations', adminOnly: true },
   {
     title: 'Auditoria de Sistema',
     icon: Activity,
@@ -79,23 +72,12 @@ const settingsItems: { title: string; icon: any; url: string; adminOnly?: boolea
     adminOnly: true,
   },
   {
-    title: 'Auditoria de Assinaturas',
+    title: 'Auditoria de Assin.',
     icon: PenLine,
     url: '/settings/signature-audit',
     adminOnly: true,
   },
-  {
-    title: 'Modelo Anatômico',
-    icon: Activity,
-    url: '/admin/anatomical-model',
-    adminOnly: false,
-  },
-  {
-    title: 'Developer Hub',
-    icon: Zap,
-    url: '/admin/developer-hub',
-    adminOnly: true,
-  },
+  { title: 'Modelo Anatômico', icon: Activity, url: '/admin/anatomical-model', adminOnly: false },
 ]
 
 export function AppSidebar() {
@@ -125,54 +107,77 @@ export function AppSidebar() {
       })
 
   return (
-    <Sidebar variant="inset">
-      <SidebarHeader className="flex h-16 items-center justify-center border-b px-4">
-        <Link to="/" className="flex items-center gap-2 font-bold text-primary">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Stethoscope className="h-5 w-5" />
+    <Sidebar variant="inset" className="border-r border-border/50">
+      <SidebarHeader className="h-16 px-6 flex items-center pt-2">
+        <Link
+          to="/"
+          className="flex items-center gap-3 font-bold text-foreground hover:opacity-90 transition-opacity"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Stethoscope className="h-4 w-4" />
           </div>
-          <span className="truncate text-lg tracking-tight">SpineCare OS</span>
+          <span className="truncate text-lg tracking-tight">SpineCare</span>
         </Link>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-3 gap-0">
         <SidebarGroup>
+          <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Principal
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      location.pathname === item.url ||
-                      (location.pathname.startsWith(item.url) && item.url !== '/')
-                    }
-                    tooltip={item.title}
-                  >
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const isActive =
+                  location.pathname === item.url ||
+                  (location.pathname.startsWith(item.url) && item.url !== '/')
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className={`rounded-lg transition-colors mb-1 ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm font-medium'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         {!isPatient && (user?.role === 'admin' || user?.role === 'manager') && (
-          <SidebarGroup className="mt-auto">
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Administração
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {settingsItems.map((item) => {
                   if (item.adminOnly && user?.role !== 'admin') return null
+                  const isActive = location.pathname === item.url
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
-                        isActive={location.pathname === item.url}
+                        isActive={isActive}
                         tooltip={item.title}
+                        className={`rounded-lg transition-colors mb-1 ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm font-medium'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
                       >
-                        <Link to={item.url}>
-                          <item.icon />
+                        <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                          <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -184,8 +189,11 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t p-4 text-xs text-center text-muted-foreground">
-        v0.0.1
+      <SidebarFooter className="p-4">
+        <div className="rounded-xl bg-muted/50 p-4 border border-border/50">
+          <p className="text-xs font-semibold text-foreground mb-1">SpineCare OS</p>
+          <p className="text-[10px] text-muted-foreground">Versão 0.0.1 • Uplane Design</p>
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

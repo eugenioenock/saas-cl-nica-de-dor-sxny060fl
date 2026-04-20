@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,11 +11,9 @@ import {
   FileText,
   DollarSign,
   Activity,
-  AlertTriangle,
   TrendingUp,
   Package,
   ShieldCheck,
-  ClipboardList,
   Settings2,
 } from 'lucide-react'
 import { ProfessionalRanking } from '@/components/dashboard/ProfessionalRanking'
@@ -111,7 +109,6 @@ export default function Index() {
     }
   }
 
-  // Loading summary metrics
   useEffect(() => {
     async function loadMetrics() {
       try {
@@ -194,7 +191,6 @@ export default function Index() {
     loadMetrics()
   }, [role, isManager, isProfessional, isReceptionist])
 
-  // Loading charts
   useEffect(() => {
     async function loadChartData() {
       if (!isManager && !isProfessional && !isReceptionist) return
@@ -296,241 +292,230 @@ export default function Index() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in-up pb-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Bem-vindo de volta,{' '}
-            <span className="font-semibold text-foreground">{user?.name || 'usuário'}</span>. Aqui
-            está o seu resumo atual.
+    <div className="space-y-6 animate-fade-in-up pb-8 max-w-7xl mx-auto px-4 md:px-0">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-4 md:pt-8">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Bem-vindo de volta, <span className="font-semibold text-foreground">{user?.name}</span>.
+            Aqui está o seu resumo de hoje.
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select value={chartPeriod} onValueChange={(v: any) => setChartPeriod(v)}>
+            <SelectTrigger className="w-[140px] h-10 bg-background rounded-full border-border/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="7d">Últimos 7 dias</SelectItem>
+              <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              <SelectItem value="month">Este Mês</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full h-10 w-10 border-border/50"
+              >
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="rounded-l-2xl">
+              <SheetHeader>
+                <SheetTitle>Personalizar Visão</SheetTitle>
+                <SheetDescription>Escolha quais métricas exibir no seu Dashboard.</SheetDescription>
+              </SheetHeader>
+              <div className="py-8 space-y-8">
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-sm text-foreground uppercase tracking-wider">
+                    Indicadores
+                  </h4>
+                  {isProfessional && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="s-app">Agendamentos</Label>
+                        <Switch
+                          id="s-app"
+                          checked={dashboardSettings.appointments}
+                          onCheckedChange={(c) =>
+                            saveDashboardSettings({ ...dashboardSettings, appointments: c })
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="s-pat">Total de Pacientes</Label>
+                        <Switch
+                          id="s-pat"
+                          checked={dashboardSettings.patients}
+                          onCheckedChange={(c) =>
+                            saveDashboardSettings({ ...dashboardSettings, patients: c })
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  {(isManager || isReceptionist) && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="s-rev">Receita Total</Label>
+                        <Switch
+                          id="s-rev"
+                          checked={dashboardSettings.revenue}
+                          onCheckedChange={(c) =>
+                            saveDashboardSettings({ ...dashboardSettings, revenue: c })
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="s-prev">Receita Pendente</Label>
+                        <Switch
+                          id="s-prev"
+                          checked={dashboardSettings.pendingRevenue}
+                          onCheckedChange={(c) =>
+                            saveDashboardSettings({ ...dashboardSettings, pendingRevenue: c })
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-sm text-foreground uppercase tracking-wider">
+                    Gráficos
+                  </h4>
+                  {(isManager || isReceptionist) && (
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="s-fchart">Evolução Financeira</Label>
+                      <Switch
+                        id="s-fchart"
+                        checked={dashboardSettings.financialChart}
+                        onCheckedChange={(c) =>
+                          saveDashboardSettings({ ...dashboardSettings, financialChart: c })
+                        }
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-cchart">Volume Clínico</Label>
+                    <Switch
+                      id="s-cchart"
+                      checked={dashboardSettings.clinicalChart}
+                      onCheckedChange={(c) =>
+                        saveDashboardSettings({ ...dashboardSettings, clinicalChart: c })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <div className="w-full overflow-x-auto pb-2 -mb-2">
-          <TabsList className="bg-muted/50 p-1 backdrop-blur-md border border-border/50 flex flex-nowrap w-max min-w-full justify-start h-auto rounded-xl">
+        <div className="w-full overflow-x-auto pb-1">
+          <TabsList className="bg-muted/40 p-1 flex flex-nowrap w-max min-w-full justify-start h-auto rounded-2xl border border-border/40">
             <TabsTrigger
               value="overview"
-              className="flex items-center gap-2 data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-md py-2.5 px-5 transition-all flex-shrink-0"
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl py-2.5 px-6 transition-all font-medium flex-shrink-0"
             >
               <Activity className="h-4 w-4" />
               <span>Visão Geral</span>
             </TabsTrigger>
             <TabsTrigger
               value="efficiency"
-              className="flex items-center gap-2 data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-md py-2.5 px-5 transition-all flex-shrink-0"
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl py-2.5 px-6 transition-all font-medium flex-shrink-0"
             >
               <TrendingUp className="h-4 w-4" />
-              <span>Eficiência & Protocolos</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="inventory"
-              className="flex items-center gap-2 data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-md py-2.5 px-5 transition-all flex-shrink-0"
-            >
-              <Package className="h-4 w-4" />
-              <span>Estoque & Insumos</span>
+              <span>Performance</span>
             </TabsTrigger>
             <TabsTrigger
               value="compliance"
-              className="flex items-center gap-2 data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-md py-2.5 px-5 transition-all flex-shrink-0"
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl py-2.5 px-6 transition-all font-medium flex-shrink-0"
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>Auditoria & Conformidade</span>
+              <span>Auditoria</span>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* TAB 1: VISÃO GERAL */}
-        <TabsContent value="overview" className="space-y-6 animate-fade-in-up mt-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
-            <h2 className="text-lg font-medium">Métricas Principais</h2>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground hidden sm:inline-block">
-                  Período:
-                </span>
-                <Select value={chartPeriod} onValueChange={(v: any) => setChartPeriod(v)}>
-                  <SelectTrigger className="w-[140px] h-9 bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                    <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                    <SelectItem value="month">Este Mês</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Editar Dashboard</span>
-                    <span className="sm:hidden">Editar</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Personalizar Dashboard</SheetTitle>
-                    <SheetDescription>
-                      Escolha quais métricas e gráficos exibir na sua Visão Geral.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="py-6 space-y-6">
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
-                        Métricas
-                      </h4>
-                      {isProfessional && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="s-app">Agendamentos</Label>
-                            <Switch
-                              id="s-app"
-                              checked={dashboardSettings.appointments}
-                              onCheckedChange={(c) =>
-                                saveDashboardSettings({ ...dashboardSettings, appointments: c })
-                              }
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="s-pat">Total de Pacientes</Label>
-                            <Switch
-                              id="s-pat"
-                              checked={dashboardSettings.patients}
-                              onCheckedChange={(c) =>
-                                saveDashboardSettings({ ...dashboardSettings, patients: c })
-                              }
-                            />
-                          </div>
-                        </>
-                      )}
-                      {(isManager || isReceptionist) && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="s-rev">Receita Total</Label>
-                            <Switch
-                              id="s-rev"
-                              checked={dashboardSettings.revenue}
-                              onCheckedChange={(c) =>
-                                saveDashboardSettings({ ...dashboardSettings, revenue: c })
-                              }
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="s-prev">Receita a Receber</Label>
-                            <Switch
-                              id="s-prev"
-                              checked={dashboardSettings.pendingRevenue}
-                              onCheckedChange={(c) =>
-                                saveDashboardSettings({ ...dashboardSettings, pendingRevenue: c })
-                              }
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
-                        Gráficos Analíticos
-                      </h4>
-                      {(isManager || isReceptionist) && (
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="s-fchart">Evolução Financeira</Label>
-                          <Switch
-                            id="s-fchart"
-                            checked={dashboardSettings.financialChart}
-                            onCheckedChange={(c) =>
-                              saveDashboardSettings({ ...dashboardSettings, financialChart: c })
-                            }
-                          />
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="s-cchart">Volume Clínico</Label>
-                        <Switch
-                          id="s-cchart"
-                          checked={dashboardSettings.clinicalChart}
-                          onCheckedChange={(c) =>
-                            saveDashboardSettings({ ...dashboardSettings, clinicalChart: c })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-          </div>
-
+        <TabsContent value="overview" className="space-y-6 animate-fade-in-up mt-0">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {isProfessional && dashboardSettings.appointments && (
-              <Card className="bg-gradient-to-br from-card to-card/50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Agendamentos Hoje</CardTitle>
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    <CalendarIcon className="h-4 w-4 text-primary" />
+              <Card className="hover:shadow-md transition-shadow duration-300">
+                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Agendamentos Hoje</p>
+                    <div className="h-10 w-10 bg-primary/10 flex items-center justify-center rounded-xl">
+                      <CalendarIcon className="h-5 w-5 text-primary" />
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{data.appointmentsToday}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Pacientes agendados para hoje
-                  </p>
+                  <div>
+                    <h3 className="text-4xl font-bold tracking-tight text-foreground">
+                      {data.appointmentsToday}
+                    </h3>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
             {isProfessional && dashboardSettings.patients && (
-              <Card className="bg-gradient-to-br from-card to-card/50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
-                  <div className="p-2 bg-blue-500/10 rounded-full">
-                    <Users className="h-4 w-4 text-blue-500" />
+              <Card className="hover:shadow-md transition-shadow duration-300">
+                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Total Pacientes</p>
+                    <div className="h-10 w-10 bg-blue-500/10 flex items-center justify-center rounded-xl">
+                      <Users className="h-5 w-5 text-blue-500" />
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{data.patientVolume}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Pacientes registrados na base
-                  </p>
+                  <div>
+                    <h3 className="text-4xl font-bold tracking-tight text-foreground">
+                      {data.patientVolume}
+                    </h3>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
             {(isManager || isReceptionist) && dashboardSettings.revenue && (
-              <Card className="bg-gradient-to-br from-card to-card/50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Receita Total (Paga)</CardTitle>
-                  <div className="p-2 bg-emerald-500/10 rounded-full">
-                    <DollarSign className="h-4 w-4 text-emerald-500" />
+              <Card className="hover:shadow-md transition-shadow duration-300">
+                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Receita Paga</p>
+                    <div className="h-10 w-10 bg-emerald-500/10 flex items-center justify-center rounded-xl">
+                      <DollarSign className="h-5 w-5 text-emerald-500" />
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                    R$ {data.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <div>
+                    <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                      <span className="text-xl text-muted-foreground font-semibold mr-1">R$</span>
+                      {data.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </h3>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Faturamento realizado</p>
                 </CardContent>
               </Card>
             )}
 
             {(isManager || isReceptionist) && dashboardSettings.pendingRevenue && (
-              <Card className="bg-gradient-to-br from-card to-card/50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Receita a Receber</CardTitle>
-                  <div className="p-2 bg-amber-500/10 rounded-full">
-                    <Activity className="h-4 w-4 text-amber-500" />
+              <Card className="hover:shadow-md transition-shadow duration-300">
+                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Receita Pendente</p>
+                    <div className="h-10 w-10 bg-amber-500/10 flex items-center justify-center rounded-xl">
+                      <Activity className="h-5 w-5 text-amber-500" />
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                    R$ {data.pendingRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <div>
+                    <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                      <span className="text-xl text-muted-foreground font-semibold mr-1">R$</span>
+                      {data.pendingRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </h3>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Faturas e repasses pendentes</p>
                 </CardContent>
               </Card>
             )}
@@ -538,39 +523,49 @@ export default function Index() {
 
           <div className="grid gap-6 md:grid-cols-2">
             {(isManager || isReceptionist) && dashboardSettings.financialChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Evolução Financeira</CardTitle>
+              <Card className="flex flex-col">
+                <div className="p-6 pb-2">
+                  <h3 className="text-lg font-semibold">Evolução Financeira</h3>
                   <p className="text-sm text-muted-foreground">
-                    Receita paga ao longo do período selecionado
+                    Receita confirmada ao longo do período
                   </p>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <CardContent className="flex-1 p-6 pt-0">
                   {chartsLoading ? (
-                    <div className="h-[300px] flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <div className="h-[280px] flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
                     </div>
                   ) : financialChartData.length > 0 ? (
                     <ChartContainer
                       config={{
-                        revenue: {
-                          label: 'Receita',
-                          color: 'hsl(var(--chart-2))',
-                        },
+                        revenue: { label: 'Receita', color: 'var(--primary)' },
                       }}
-                      className="h-[300px] w-full"
+                      className="h-[280px] w-full"
                     >
-                      <AreaChart data={financialChartData} margin={{ left: -20, right: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <AreaChart
+                        data={financialChartData}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="hsl(var(--border))"
+                        />
                         <XAxis
                           dataKey="date"
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(val) => {
-                            const [y, m, d] = val.split('-')
+                            const [_, m, d] = val.split('-')
                             return `${d}/${m}`
                           }}
-                          tick={{ fontSize: 12 }}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                           dy={10}
                         />
                         <YAxis
@@ -579,22 +574,22 @@ export default function Index() {
                           tickFormatter={(val) =>
                             `R$${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}`
                           }
-                          tick={{ fontSize: 12 }}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                         />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Area
                           type="monotone"
                           dataKey="revenue"
-                          stroke="var(--color-revenue)"
-                          fill="var(--color-revenue)"
-                          fillOpacity={0.2}
-                          strokeWidth={2}
+                          stroke="var(--primary)"
+                          fillOpacity={1}
+                          fill="url(#colorRevenue)"
+                          strokeWidth={3}
                         />
                       </AreaChart>
                     </ChartContainer>
                   ) : (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      Nenhum dado financeiro no período.
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                      Nenhum dado financeiro.
                     </div>
                   )}
                 </CardContent>
@@ -602,58 +597,61 @@ export default function Index() {
             )}
 
             {dashboardSettings.clinicalChart && (
-              <Card className={!isManager && !isReceptionist ? 'md:col-span-2 lg:col-span-1' : ''}>
-                <CardHeader>
-                  <CardTitle>Volume Clínico</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Atendimentos confirmados e realizados
-                  </p>
-                </CardHeader>
-                <CardContent>
+              <Card className="flex flex-col">
+                <div className="p-6 pb-2">
+                  <h3 className="text-lg font-semibold">Volume Clínico</h3>
+                  <p className="text-sm text-muted-foreground">Atendimentos no período</p>
+                </div>
+                <CardContent className="flex-1 p-6 pt-0">
                   {chartsLoading ? (
-                    <div className="h-[300px] flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <div className="h-[280px] flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
                     </div>
                   ) : clinicalChartData.length > 0 ? (
                     <ChartContainer
                       config={{
-                        appointments: {
-                          label: 'Atendimentos',
-                          color: 'hsl(var(--chart-1))',
-                        },
+                        appointments: { label: 'Atendimentos', color: 'hsl(var(--chart-2))' },
                       }}
-                      className="h-[300px] w-full"
+                      className="h-[280px] w-full"
                     >
-                      <BarChart data={clinicalChartData} margin={{ left: -20, right: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <BarChart
+                        data={clinicalChartData}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        barSize={24}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="hsl(var(--border))"
+                        />
                         <XAxis
                           dataKey="date"
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(val) => {
-                            const [y, m, d] = val.split('-')
+                            const [_, m, d] = val.split('-')
                             return `${d}/${m}`
                           }}
-                          tick={{ fontSize: 12 }}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                           dy={10}
                         />
                         <YAxis
                           tickLine={false}
                           axisLine={false}
-                          tick={{ fontSize: 12 }}
                           allowDecimals={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                         />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Bar
                           dataKey="appointments"
-                          fill="var(--color-appointments)"
-                          radius={[4, 4, 0, 0]}
+                          fill="hsl(var(--chart-2))"
+                          radius={[6, 6, 0, 0]}
                         />
                       </BarChart>
                     </ChartContainer>
                   ) : (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      Nenhum atendimento no período.
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                      Nenhum atendimento.
                     </div>
                   )}
                 </CardContent>
@@ -662,8 +660,7 @@ export default function Index() {
           </div>
         </TabsContent>
 
-        {/* TAB 2: EFICIÊNCIA E PROTOCOLOS */}
-        <TabsContent value="efficiency" className="space-y-6 animate-fade-in-up mt-2">
+        <TabsContent value="efficiency" className="space-y-6 animate-fade-in-up mt-0">
           <PerformanceInsights />
           <div className="grid gap-6 lg:grid-cols-2">
             <ClinicGamificationWidget />
@@ -675,100 +672,57 @@ export default function Index() {
           </div>
         </TabsContent>
 
-        {/* TAB 3: ESTOQUE E INSUMOS */}
-        <TabsContent value="inventory" className="space-y-6 animate-fade-in-up mt-2">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {isManager && (
-              <Card className="border-destructive/30 bg-destructive/5 hover:bg-destructive/10 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-destructive">
-                    Alertas de Estoque
-                  </CardTitle>
-                  <div className="p-2 bg-destructive/10 rounded-full">
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-destructive">{data.lowStock}</div>
-                  <p className="text-xs text-destructive/80 mt-1">
-                    Itens abaixo da quantidade mínima
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="bg-gradient-to-br from-card to-card/50">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Status de Fornecedores</CardTitle>
-                <div className="p-2 bg-blue-500/10 rounded-full">
-                  <Package className="h-4 w-4 text-blue-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">Ativo</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Nenhum atraso de entrega detectado
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* TAB 4: AUDITORIA E CONFORMIDADE */}
-        <TabsContent value="compliance" className="space-y-6 animate-fade-in-up mt-2">
+        <TabsContent value="compliance" className="space-y-6 animate-fade-in-up mt-0">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {isProfessional && (
-              <Card className="border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                    Prontuários Pendentes
-                  </CardTitle>
-                  <div className="p-2 bg-amber-500/10 rounded-full">
-                    <FileText className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+              <Card className="hover:shadow-md transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 bg-amber-500/10 flex items-center justify-center rounded-xl">
+                      <FileText className="h-6 w-6 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Prontuários Pendentes
+                      </p>
+                      <h3 className="text-3xl font-bold text-foreground">{data.pendingNotes}</h3>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-amber-600 dark:text-amber-500">
-                    {data.pendingNotes}
-                  </div>
-                  <p className="text-xs text-amber-700/80 dark:text-amber-500/80 mt-1">
-                    Aguardando finalização ou assinatura
-                  </p>
                 </CardContent>
               </Card>
             )}
 
             {isManager && (
-              <Card className="bg-gradient-to-br from-card to-card/50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Score de Conformidade</CardTitle>
-                  <div className="p-2 bg-emerald-500/10 rounded-full">
-                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <Card className="hover:shadow-md transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 bg-destructive/10 flex items-center justify-center rounded-xl">
+                      <Package className="h-6 w-6 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Alertas de Estoque
+                      </p>
+                      <h3 className="text-3xl font-bold text-foreground">{data.lowStock}</h3>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                    98%
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Assinaturas e registros em dia
-                  </p>
                 </CardContent>
               </Card>
             )}
 
-            <Card className="bg-gradient-to-br from-card to-card/50">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ações de Auditoria</CardTitle>
-                <div className="p-2 bg-primary/10 rounded-full">
-                  <ClipboardList className="h-4 w-4 text-primary" />
+            <Card className="hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-primary/10 flex items-center justify-center rounded-xl">
+                    <ShieldCheck className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Score de Conformidade
+                    </p>
+                    <h3 className="text-3xl font-bold text-foreground">98%</h3>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">0</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Nenhuma discrepância identificada
-                </p>
               </CardContent>
             </Card>
           </div>
