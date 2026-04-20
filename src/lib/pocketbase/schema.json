@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T23:58:49.498Z",
+  "generatedAt": "2026-04-20T00:03:08.045Z",
   "collections": [
     {
       "name": "users",
@@ -165,6 +165,19 @@
           "required": false,
           "system": false,
           "collectionRef": "clinic_settings"
+        },
+        {
+          "name": "locked_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "locked_at",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX `idx_patients_clinic_id` ON `patients` (clinic_id)"]
@@ -1388,9 +1401,9 @@
       "name": "action_logs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
-        "view": "@request.auth.role = 'admin' || @request.auth.role = 'manager'",
-        "create": null,
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
         "update": null,
         "delete": null
       },

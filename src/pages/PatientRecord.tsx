@@ -89,6 +89,10 @@ export default function PatientRecord() {
   const { id } = useParams()
   const { user } = useAuth()
   const [isAdjusting, setIsAdjusting] = useState(false)
+  const isAdjustingRef = useRef(isAdjusting)
+  useEffect(() => {
+    isAdjustingRef.current = isAdjusting
+  }, [isAdjusting])
   const [isSavingAdjustments, setIsSavingAdjustments] = useState(false)
   const [draftPoints, setDraftPoints] = useState<any[]>([])
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
@@ -100,6 +104,7 @@ export default function PatientRecord() {
     notes: [],
     catalog: [],
     usages: [],
+    actionLogs: [],
   })
   const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [users, setUsers] = useState<any[]>([])
@@ -131,15 +136,35 @@ export default function PatientRecord() {
   })
   const [isSubmittingUsage, setIsSubmittingUsage] = useState(false)
 
-  const startAdjusting = () => {
-    setIsAdjusting(true)
-    setDraftPoints(JSON.parse(JSON.stringify(data.points)))
+  const startAdjusting = async () => {
+    try {
+      if (id) {
+        await pb.collection('patients').update(id, {
+          locked_by: user?.id,
+          locked_at: new Date().toISOString(),
+        })
+      }
+      setIsAdjusting(true)
+      setDraftPoints(JSON.parse(JSON.stringify(data.points)))
+    } catch (error) {
+      toast.error('Erro ao iniciar ajuste. Tente novamente.')
+    }
   }
 
-  const cancelAdjusting = () => {
+  const cancelAdjusting = async () => {
     setIsAdjusting(false)
     setDraftPoints([])
     setDraggingPointId(null)
+    try {
+      if (id && data.patient?.locked_by === user?.id) {
+        await pb.collection('patients').update(id, {
+          locked_by: null,
+          locked_at: null,
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao remover lock:', error)
+    }
   }
 
   const saveAdjustments = async () => {
@@ -164,7 +189,29 @@ export default function PatientRecord() {
 
       if (hasChanges) {
         setData((prev: any) => ({ ...prev, points: updatedLocalPoints }))
-        toast.success('Posições salvas com sucesso!')
+
+        await pb
+          .collection('action_logs')
+          .create({
+            user_id: user?.id,
+            action: 'update_pain_points',
+            collection_name: 'patients',
+            record_id: id,
+            clinic_id: data.patient?.clinic_id,
+          })
+          .catch(console.error)
+      }
+
+      toast.success('Posições salvas com sucesso!')
+
+      if (id && data.patient?.locked_by === user?.id) {
+        await pb
+          .collection('patients')
+          .update(id, {
+            locked_by: null,
+            locked_at: null,
+          })
+          .catch(console.error)
       }
 
       setIsAdjusting(false)
@@ -225,8 +272,9 @@ export default function PatientRecord() {
         usagesRes,
         inventoryRes,
         batchesRes,
+        actionLogsRes,
       ] = await Promise.all([
-        pb.collection('patients').getOne(id!),
+        pb.collection('patients').getOne(id!, { expand: 'locked_by' }),
         pb
           .collection('pain_points')
           .getFullList({ filter: `patient_id="${id}"`, sort: '-created' }),
@@ -248,8 +296,23 @@ export default function PatientRecord() {
         pb
           .collection('inventory_batches')
           .getFullList({ filter: 'current_quantity > 0', sort: 'expiry_date' }),
+        pb
+          .collection('action_logs')
+          .getFullList({
+            filter: `record_id="${id}" && action="update_pain_points"`,
+            sort: '-created',
+            expand: 'user_id',
+          })
+          .catch(() => []),
       ])
-      setData({ patient, points, notes, catalog: catalog.map((c) => c.name), usages: usagesRes })
+      setData({
+        patient,
+        points,
+        notes,
+        catalog: catalog.map((c) => c.name),
+        usages: usagesRes,
+        actionLogs: actionLogsRes,
+      })
       setUsers(usersRes)
       setInventoryItems(inventoryRes)
       setBatchItems(batchesRes)
@@ -265,11 +328,23 @@ export default function PatientRecord() {
 
   useEffect(() => {
     load()
+    return () => {
+      if (id && isAdjustingRef.current) {
+        pb.collection('patients')
+          .update(id, {
+            locked_by: null,
+            locked_at: null,
+          })
+          .catch(() => {})
+      }
+    }
   }, [id])
+  useRealtime('patients', load)
   useRealtime('pain_points', load)
   useRealtime('medical_notes', load)
   useRealtime('pathologies_catalog', load)
   useRealtime('inventory_usage', load)
+  useRealtime('action_logs', load)
 
   const saveUsage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -380,6 +455,14 @@ export default function PatientRecord() {
     },
   }
 
+  const isLockedByOther = () => {
+    if (!data.patient?.locked_by || !data.patient?.locked_at) return false
+    if (data.patient.locked_by === user?.id) return false
+    const lockTime = new Date(data.patient.locked_at).getTime()
+    const now = new Date().getTime()
+    return now - lockTime < 30 * 60 * 1000 // 30 minutes
+  }
+
   return (
     <>
       <div className="space-y-6 print:hidden">
@@ -435,6 +518,11 @@ export default function PatientRecord() {
                         <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
                       </TooltipContent>
                     </Tooltip>
+                  ) : isLockedByOther() ? (
+                    <Button size="sm" variant="outline" disabled className="opacity-80">
+                      Este mapa está sendo editado por{' '}
+                      {data.patient?.expand?.locked_by?.name || 'outro usuário'}
+                    </Button>
                   ) : isAdjusting ? (
                     <>
                       <Button
@@ -754,6 +842,54 @@ export default function PatientRecord() {
                 </ScrollArea>
               </CardContent>
             </Card>
+
+            <div className="md:col-span-3 mt-2">
+              <Card className="glass-panel border-0 shadow-lg">
+                <CardHeader className="bg-background/50 border-b pb-4">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    Histórico de Alterações
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[200px] w-full">
+                    {data.actionLogs && data.actionLogs.length > 0 ? (
+                      <div className="divide-y divide-border/50">
+                        {data.actionLogs.map((log: any) => (
+                          <div
+                            key={log.id}
+                            className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
+                                {log.expand?.user_id?.name?.substring(0, 2).toUpperCase() || 'U'}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-foreground">
+                                  {log.expand?.user_id?.name || 'Usuário desconhecido'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Ajustou as posições dos marcadores
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-md">
+                              {new Date(log.created).toLocaleString('pt-BR', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        Nenhuma alteração registrada recentemente.
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="notes" className="mt-4">
