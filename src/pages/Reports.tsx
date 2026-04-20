@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Printer, Loader2, BarChart3, Activity, Search, TrendingUp, Receipt } from 'lucide-react'
+import {
+  Printer,
+  Loader2,
+  BarChart3,
+  Activity,
+  Search,
+  TrendingUp,
+  Receipt,
+  Map,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,6 +23,8 @@ import {
 } from '@/components/ui/table'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAuth } from '@/hooks/use-auth'
+import bodyImage from '@/assets/corpo-humano-a2474.jpg'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import {
@@ -36,7 +47,9 @@ const chartConfig = {
 }
 
 export default function Reports() {
+  const { user } = useAuth()
   const [stats, setStats] = useState<any[]>([])
+  const [allPainPoints, setAllPainPoints] = useState<any[]>([])
   const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
@@ -44,20 +57,24 @@ export default function Reports() {
   const [batchSearch, setBatchSearch] = useState('')
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [isSearchingBatch, setIsSearchingBatch] = useState(false)
-  const [activeTab, setActiveTab] = useState('epidemiology')
+  const [activeTab, setActiveTab] = useState('heatmap')
+  const [heatmapView, setHeatmapView] = useState<'front' | 'back'>('back')
 
   const [efficiencyChartData, setEfficiencyChartData] = useState<any[]>([])
   const [wasteReport, setWasteReport] = useState<any[]>([])
 
   const loadData = async () => {
     try {
+      const filter = user?.role === 'manager' ? `patient_id.clinic_id="${user.clinic_id}"` : ''
       const [points, settingsRes] = await Promise.all([
-        pb.collection('pain_points').getFullList(),
+        pb.collection('pain_points').getFullList({ filter, expand: 'patient_id' }),
         pb
           .collection('clinic_settings')
           .getList(1, 1)
           .catch(() => null),
       ])
+
+      setAllPainPoints(points)
 
       if (settingsRes && settingsRes.items.length > 0) {
         setClinicSettings(settingsRes.items[0])
@@ -276,11 +293,80 @@ export default function Reports() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex-wrap">
+            <TabsTrigger value="heatmap">Heatmap Anatômico</TabsTrigger>
             <TabsTrigger value="epidemiology">Epidemiológico</TabsTrigger>
             <TabsTrigger value="efficiency">Eficiência de Protocolos</TabsTrigger>
             <TabsTrigger value="audit">Auditoria de Lotes</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="heatmap">
+            <Card>
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Map className="h-5 w-5" />
+                    Heatmap de Dor (Performance Dashboard)
+                  </CardTitle>
+                  <CardDescription>
+                    Visualização da densidade de pontos de dor registrados em toda a clínica.
+                  </CardDescription>
+                </div>
+                <div className="flex bg-muted p-1 rounded-md">
+                  <Button
+                    variant={heatmapView === 'front' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setHeatmapView('front')}
+                  >
+                    Frente
+                  </Button>
+                  <Button
+                    variant={heatmapView === 'back' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setHeatmapView('back')}
+                  >
+                    Costas
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="flex justify-center p-6 bg-slate-950/40 rounded-b-xl border-t">
+                <div className="relative aspect-[1/2] w-full max-w-sm overflow-hidden bg-slate-950 rounded-2xl shadow-2xl border border-slate-800">
+                  <img
+                    src={
+                      heatmapView === 'back'
+                        ? bodyImage
+                        : 'https://img.usecurling.com/p/600/1200?q=anatomy%20front%20muscles&color=cyan'
+                    }
+                    alt={`Anatomia ${heatmapView}`}
+                    className="w-full h-full object-cover opacity-70 pointer-events-none"
+                  />
+                  {allPainPoints
+                    .filter((p) => (p.view || 'back') === heatmapView)
+                    .map((pt) => (
+                      <div
+                        key={pt.id}
+                        className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full mix-blend-screen pointer-events-none"
+                        style={{
+                          left: `${pt.x}%`,
+                          top: `${pt.y}%`,
+                          width: `${(pt.intensity || 5) * 6 + 24}px`,
+                          height: `${(pt.intensity || 5) * 6 + 24}px`,
+                          background:
+                            'radial-gradient(circle, rgba(239,68,68,0.7) 0%, rgba(239,68,68,0.4) 40%, rgba(239,68,68,0) 80%)',
+                        }}
+                      />
+                    ))}
+                  {allPainPoints.filter((p) => (p.view || 'back') === heatmapView).length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-white/50 text-sm text-center px-4 font-medium">
+                      Nenhum ponto registrado nesta visão.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="epidemiology">
             <Card>
@@ -549,17 +635,33 @@ export default function Reports() {
           </div>
           <div className="text-right text-gray-600 flex flex-col justify-end">
             <span className="font-semibold text-black uppercase mb-1">
-              {activeTab === 'epidemiology'
-                ? 'Relatório Epidemiológico'
-                : activeTab === 'efficiency'
-                  ? 'Eficiência de Protocolos'
-                  : 'Auditoria de Lotes'}
+              {activeTab === 'heatmap'
+                ? 'Heatmap Anatômico'
+                : activeTab === 'epidemiology'
+                  ? 'Relatório Epidemiológico'
+                  : activeTab === 'efficiency'
+                    ? 'Eficiência de Protocolos'
+                    : 'Auditoria de Lotes'}
             </span>
             <span>Gerado em: {new Date().toLocaleDateString()}</span>
           </div>
         </div>
 
-        {activeTab === 'epidemiology' ? (
+        {activeTab === 'heatmap' ? (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-4 uppercase bg-gray-100 p-2 rounded">
+              Heatmap Anatômico
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Total de pontos registrados na clínica: <strong>{allPainPoints.length}</strong>
+            </p>
+            <div className="text-sm italic text-gray-500 border p-4 rounded">
+              Nota: A visualização gráfica do heatmap não está disponível na impressão em PDF por
+              limitações de formatação de imagem. Utilize o painel digital para visualização
+              interativa.
+            </div>
+          </div>
+        ) : activeTab === 'epidemiology' ? (
           <div className="mb-8">
             <h2 className="text-lg font-bold mb-4 uppercase bg-gray-100 p-2 rounded">
               Prevalência de Patologias

@@ -35,6 +35,58 @@ export default function AnatomicalModelEditor() {
   const [saving, setSaving] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        document.getElementById('save-model-btn')?.click()
+        return
+      }
+
+      if (!selectedPointId) return
+
+      if (e.key === 'Escape') {
+        setSelectedPointId(null)
+        return
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        setPoints((prev) => prev.filter((p) => p.id !== selectedPointId))
+        setSelectedPointId(null)
+        return
+      }
+
+      const step = e.shiftKey ? 5 : 1
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setPoints((prev) =>
+          prev.map((p) => (p.id === selectedPointId ? { ...p, y: Math.max(0, p.y - step) } : p)),
+        )
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setPoints((prev) =>
+          prev.map((p) => (p.id === selectedPointId ? { ...p, y: Math.min(100, p.y + step) } : p)),
+        )
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setPoints((prev) =>
+          prev.map((p) => (p.id === selectedPointId ? { ...p, x: Math.max(0, p.x - step) } : p)),
+        )
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setPoints((prev) =>
+          prev.map((p) => (p.id === selectedPointId ? { ...p, x: Math.min(100, p.x + step) } : p)),
+        )
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedPointId])
 
   useEffect(() => {
     const loadTemplate = async () => {
@@ -102,7 +154,7 @@ export default function AnatomicalModelEditor() {
             Configure as posições globais padrão para os marcadores de dor
           </p>
         </div>
-        <Button onClick={saveModel} disabled={saving}>
+        <Button id="save-model-btn" onClick={saveModel} disabled={saving}>
           {saving ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
@@ -117,10 +169,31 @@ export default function AnatomicalModelEditor() {
           <CardHeader>
             <CardTitle>Editor Visual</CardTitle>
             <CardDescription>
-              Arraste os marcadores para definir a posição padrão de cada região no modelo humano.
+              Arraste os marcadores ou use o teclado para definir a posição padrão de cada região.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-6 bg-slate-950 flex items-center justify-center rounded-b-xl border-t">
+          <CardContent className="p-6 bg-slate-950 flex flex-col items-center justify-center rounded-b-xl border-t relative">
+            <div className="absolute top-4 right-4 bg-black/60 text-[10px] text-white p-3 rounded-lg border border-white/10 hidden md:block z-10 pointer-events-none">
+              <p className="font-semibold mb-2 text-cyan-400">Atalhos de Teclado:</p>
+              <ul className="space-y-1.5 opacity-90">
+                <li>
+                  <kbd className="bg-white/20 px-1.5 py-0.5 rounded mr-1">Setas</kbd> Mover 1%
+                </li>
+                <li>
+                  <kbd className="bg-white/20 px-1.5 py-0.5 rounded mr-1">Shift + Setas</kbd> Mover
+                  5%
+                </li>
+                <li>
+                  <kbd className="bg-white/20 px-1.5 py-0.5 rounded mr-1">Del</kbd> Remover Ponto
+                </li>
+                <li>
+                  <kbd className="bg-white/20 px-1.5 py-0.5 rounded mr-1">Esc</kbd> Deselecionar
+                </li>
+                <li>
+                  <kbd className="bg-white/20 px-1.5 py-0.5 rounded mr-1">Ctrl+S</kbd> Salvar
+                </li>
+              </ul>
+            </div>
             <div
               ref={containerRef}
               className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none"
@@ -145,6 +218,7 @@ export default function AnatomicalModelEditor() {
                       e.stopPropagation()
                       e.currentTarget.setPointerCapture(e.pointerId)
                       setDraggingPointId(pt.id)
+                      setSelectedPointId(pt.id)
                     }}
                     onPointerMove={(e) => {
                       if (draggingPointId !== pt.id || !containerRef.current) return
@@ -162,10 +236,10 @@ export default function AnatomicalModelEditor() {
                     }}
                     className={cn(
                       'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75 cursor-move z-30',
-                      draggingPointId === pt.id
-                        ? 'bg-cyan-400/80 shadow-[0_0_20px_10px_rgba(34,211,238,0.8)] border-2 border-cyan-400 scale-110'
+                      draggingPointId === pt.id || selectedPointId === pt.id
+                        ? 'bg-cyan-400/80 shadow-[0_0_20px_10px_rgba(34,211,238,0.8)] border-2 border-cyan-400 scale-110 ring-2 ring-white/80'
                         : 'bg-cyan-400/40 shadow-[0_0_10px_5px_rgba(34,211,238,0.4)] border-2 border-cyan-400/80',
-                      draggingPointId && draggingPointId !== pt.id && 'opacity-50',
+                      selectedPointId && selectedPointId !== pt.id && 'opacity-50',
                     )}
                     style={{
                       left: `${pt.x}%`,
