@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { Navigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Activity, Loader2 } from 'lucide-react'
@@ -26,7 +26,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>
 
 export default function Login() {
-  const { signIn, user, loading } = useAuth()
+  const { signIn } = useAuth()
   const { toast } = useToast()
   const [settings, setSettings] = useState<any>(null)
 
@@ -46,28 +46,6 @@ export default function Login() {
       })
       .catch(console.error)
   }, [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (user) {
-    const dashUrl =
-      user.role === 'admin'
-        ? '/admin/dashboard'
-        : user.role === 'manager'
-          ? '/manager/dashboard'
-          : user.role === 'professional'
-            ? '/professional/dashboard'
-            : user.role === 'receptionist'
-              ? '/reception/dashboard'
-              : '/portal'
-    return <Navigate to={dashUrl} replace />
-  }
 
   const onSubmit = async (data: LoginFormValues) => {
     const res = await signIn(data.email, data.password)

@@ -45,7 +45,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { ThemeProvider } from '@/components/theme-provider'
-import { Loader2 } from 'lucide-react'
+import PublicLayout from './components/PublicLayout'
 
 const getDashUrl = (role?: string) => {
   if (role === 'admin') return '/admin/dashboard'
@@ -53,23 +53,6 @@ const getDashUrl = (role?: string) => {
   if (role === 'professional') return '/professional/dashboard'
   if (role === 'receptionist') return '/reception/dashboard'
   return '/portal'
-}
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!user) return <Navigate to="/login" replace />
-  if (user.status === 'pending' || user.status === 'rejected')
-    return <Navigate to="/pending-approval" replace />
-  return <>{children}</>
 }
 
 const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactNode }) => {
@@ -95,17 +78,13 @@ const App = () => (
             <Toaster />
             <Sonner />
             <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<PublicLayout />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+              </Route>
 
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
+              <Route element={<Layout />}>
                 <Route path="/" element={<RouteDispatcher />} />
 
                 {/* Dashboards */}
