@@ -310,11 +310,18 @@ export default function PatientRecord() {
         pb.collection('patients').getOne(id!, { expand: 'locked_by' }),
         pb
           .collection('pain_points')
-          .getFullList({ filter: `patient_id="${id}"`, sort: '-created' }),
+          .getFullList({ filter: `patient_id="${id}"`, sort: '-created' })
+          .catch(() => []),
+        user?.role !== 'receptionist'
+          ? pb
+              .collection('medical_notes')
+              .getFullList({ filter: `patient_id="${id}"`, sort: '-date,-created' })
+              .catch(() => [])
+          : Promise.resolve([]),
         pb
-          .collection('medical_notes')
-          .getFullList({ filter: `patient_id="${id}"`, sort: '-date,-created' }),
-        pb.collection('pathologies_catalog').getFullList({ sort: 'name' }),
+          .collection('pathologies_catalog')
+          .getFullList({ sort: 'name' })
+          .catch(() => []),
         pb
           .collection('clinic_settings')
           .getList(1, 1)
@@ -564,539 +571,547 @@ export default function PatientRecord() {
               <p className="text-muted-foreground">{data.patient.document}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleExportFullRecord} disabled={isExporting}>
-            {isExporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="mr-2 h-4 w-4" />
-            )}
-            {isExporting ? 'Gerando PDF...' : 'Exportar Ficha Completa'}
-          </Button>
+          {user?.role !== 'receptionist' && (
+            <Button variant="outline" onClick={handleExportFullRecord} disabled={isExporting}>
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="mr-2 h-4 w-4" />
+              )}
+              {isExporting ? 'Gerando PDF...' : 'Exportar Ficha Completa'}
+            </Button>
+          )}
         </div>
-        <Tabs defaultValue="map">
+        <Tabs defaultValue={user?.role === 'receptionist' ? 'appointments' : 'map'}>
           <TabsList className="w-full sm:w-auto overflow-x-auto justify-start">
-            <TabsTrigger value="map">Mapa de Dor</TabsTrigger>
-            <TabsTrigger value="notes">Prontuário</TabsTrigger>
+            {user?.role !== 'receptionist' && <TabsTrigger value="map">Mapa de Dor</TabsTrigger>}
+            {user?.role !== 'receptionist' && <TabsTrigger value="notes">Prontuário</TabsTrigger>}
             <TabsTrigger value="appointments">Agendamentos</TabsTrigger>
-            <TabsTrigger value="evolution">Evolução</TabsTrigger>
-            <TabsTrigger value="inventory">Materiais Utilizados</TabsTrigger>
+            {user?.role !== 'receptionist' && <TabsTrigger value="evolution">Evolução</TabsTrigger>}
+            {user?.role !== 'receptionist' && (
+              <TabsTrigger value="inventory">Materiais Utilizados</TabsTrigger>
+            )}
           </TabsList>
 
-          <TabsContent value="map" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-            <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
-                <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
-                <div className="flex gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleSyncPoints}
-                        disabled={isSyncing || isAdjusting}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Sincronizar posições com o Modelo Master</TooltipContent>
-                  </Tooltip>
-                  {data.points.length === 0 ? (
+          {user?.role !== 'receptionist' && (
+            <TabsContent value="map" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+              <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
+                  <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
+                  <div className="flex gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div tabIndex={0}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            className="pointer-events-none opacity-50"
-                          >
-                            Ajustar Marcadores
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleSyncPoints}
+                          disabled={isSyncing || isAdjusting}
+                        >
+                          {isSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
-                      </TooltipContent>
+                      <TooltipContent>Sincronizar posições com o Modelo Master</TooltipContent>
                     </Tooltip>
-                  ) : isLockedByOther() ? (
-                    <Button size="sm" variant="outline" disabled className="opacity-80">
-                      Sendo editado por {data.patient?.expand?.locked_by?.name || 'outro'}
-                    </Button>
-                  ) : isAdjusting ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={cancelAdjusting}
-                        disabled={isSavingAdjustments}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button size="sm" onClick={saveAdjustments} disabled={isSavingAdjustments}>
-                        {isSavingAdjustments && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        {isSavingAdjustments ? 'Salvando...' : 'Concluir'}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={startAdjusting}>
-                      Ajustar Marcadores
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 bg-slate-950 flex items-center justify-center">
-                <div
-                  ref={containerRef}
-                  className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none"
-                >
-                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
-                  <img
-                    src={bodyImage}
-                    alt="Anatomia Muscular (Costas)"
-                    className={cn(
-                      'w-full h-full object-cover pointer-events-none transition-all duration-500',
-                      isAdjusting && 'opacity-80 grayscale-[30%] brightness-75',
-                    )}
-                    onError={(e) => {
-                      e.currentTarget.src =
-                        'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
-                    }}
-                  />
-
-                  {!isAdjusting &&
-                    data.anatomyRegions.map((region: any) => {
-                      const isActive = data.points.some((p: any) => p.name === region.name)
-                      if (isActive) return null
-
-                      return (
-                        <div
-                          key={region.id}
-                          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
-                          style={{
-                            left: `${region.x}%`,
-                            top: `${region.y}%`,
-                            width: `${region.w}%`,
-                            height: `${region.h}%`,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRegionClick(region, null)
-                          }}
-                        />
-                      )
-                    })}
-
-                  {(isAdjusting ? draftPoints : data.points).map((pt: any) => {
-                    const region = data.anatomyRegions.find((r: any) => r.name === pt.name)
-                    const w = region ? region.w : 10
-                    const h = region ? region.h : 10
-                    const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
-
-                    const PointElement = (
-                      <div
-                        key={pt.id}
-                        onPointerDown={(e) => {
-                          if (!isAdjusting) return
-                          e.preventDefault()
-                          e.stopPropagation()
-                          e.currentTarget.setPointerCapture(e.pointerId)
-                          setDraggingPointId(pt.id)
-                        }}
-                        onPointerMove={(e) => {
-                          if (!isAdjusting || draggingPointId !== pt.id || !containerRef.current)
-                            return
-                          const rect = containerRef.current.getBoundingClientRect()
-                          let x = ((e.clientX - rect.left) / rect.width) * 100
-                          let y = ((e.clientY - rect.top) / rect.height) * 100
-                          x = Number(Math.max(0, Math.min(100, x)).toFixed(1))
-                          y = Number(Math.max(0, Math.min(100, y)).toFixed(1))
-                          setDraftPoints((prev) =>
-                            prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
-                          )
-                        }}
-                        onPointerUp={(e) => {
-                          if (!isAdjusting || draggingPointId !== pt.id) return
-                          e.currentTarget.releasePointerCapture(e.pointerId)
-                          setDraggingPointId(null)
-                        }}
-                        className={cn(
-                          'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
-                          isAdjusting ? 'cursor-move z-30' : 'cursor-pointer z-20',
-                          isAdjusting
-                            ? draggingPointId === pt.id
-                              ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
-                              : 'bg-yellow-400/40 shadow-[0_0_10px_5px_rgba(250,204,21,0.4)] border-2 border-yellow-400/80'
-                            : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
-                          isAdjusting &&
-                            draggingPointId &&
-                            draggingPointId !== pt.id &&
-                            'opacity-50',
-                        )}
-                        style={{
-                          left: `${pt.x}%`,
-                          top: `${pt.y}%`,
-                          width: `${w}%`,
-                          height: `${h}%`,
-                          touchAction: isAdjusting ? 'none' : 'auto',
-                        }}
-                        onClick={(e) => {
-                          if (isAdjusting) return
-                          e.stopPropagation()
-                          handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
-                        }}
-                      >
-                        {isAdjusting && draggingPointId === pt.id && (
-                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
-                            {pt.x.toFixed(1)}%, {pt.y.toFixed(1)}%
-                          </div>
-                        )}
-                      </div>
-                    )
-
-                    if (isAdjusting) return PointElement
-
-                    return (
-                      <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
-                        <HoverCardTrigger asChild>{PointElement}</HoverCardTrigger>
-                        <HoverCardContent
-                          className="w-72 z-50 glass-panel border-border/50 p-4"
-                          align="center"
-                          side="right"
-                          sideOffset={15}
-                        >
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
-                                <div
-                                  className={cn(
-                                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0',
-                                    getIntensityColor(pt.intensity || 5),
-                                  )}
-                                >
-                                  {globalIndex + 1}
-                                </div>
-                                {pt.name}
-                              </h4>
-                              <Badge
-                                className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
-                              >
-                                Nível {pt.intensity || 5}
-                              </Badge>
-                            </div>
-
-                            {pt.pathologies?.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {pt.pathologies.map((p: string) => (
-                                  <Badge
-                                    key={p}
-                                    variant="secondary"
-                                    className="text-[10px] px-1.5 py-0 h-5 font-medium bg-muted/80"
-                                  >
-                                    {p}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-
-                            {pt.notes ? (
-                              <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50 line-clamp-3 leading-relaxed">
-                                {pt.notes}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground italic opacity-70">
-                                Sem observações clínicas.
-                              </p>
-                            )}
-
-                            <div className="pt-2 border-t flex gap-2 justify-end">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  remove(pt.id)
-                                }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setForm({ ...pt, pathologies: pt.pathologies || [] })
-                                  setIsOpen(true)
-                                }}
-                              >
-                                Editar Detalhes
-                              </Button>
-                            </div>
-                          </div>
-                        </HoverCardContent>
-                      </HoverCard>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-panel border-0 shadow-lg flex flex-col h-full">
-              <CardHeader className="bg-background/50 border-b pb-4">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  Pontos Ativos
-                  <Badge variant="outline" className="ml-2 font-normal bg-background shadow-sm">
-                    {data.points.length} Total
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 p-0 overflow-hidden bg-gradient-to-b from-transparent to-muted/10">
-                <ScrollArea className="h-[600px] w-full">
-                  <div className="p-4 space-y-3">
                     {data.points.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-16 flex flex-col items-center">
-                        <div className="bg-muted/30 p-4 rounded-full mb-4">
-                          <MapPin className="h-8 w-8 text-primary/40" strokeWidth={1.5} />
-                        </div>
-                        <p className="text-base font-semibold text-foreground">
-                          Nenhum ponto registrado.
-                        </p>
-                        <p className="text-sm opacity-80 mt-2 max-w-[280px]">
-                          Clique na imagem anatômica para adicionar um novo ponto de dor e iniciar o
-                          mapeamento.
-                        </p>
-                      </div>
-                    ) : (
-                      data.points.map((pt: any, index: number) => (
-                        <div
-                          key={pt.id}
-                          className="p-3.5 bg-background border border-border/50 rounded-xl text-sm relative group shadow-sm hover:shadow-md transition-all duration-300 hover:border-primary/30"
-                        >
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 h-7 w-7 transition-opacity hover:bg-destructive/10"
-                            onClick={() => remove(pt.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-
-                          <div className="font-bold flex gap-2.5 items-center text-foreground pr-8">
-                            <div
-                              className={cn(
-                                'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm',
-                                getIntensityColor(pt.intensity || 5),
-                              )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div tabIndex={0}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              className="pointer-events-none opacity-50"
                             >
-                              {index + 1}
-                            </div>
-                            <span className="truncate text-sm">
-                              {pt.name || 'Ponto não nomeado'}
-                            </span>
+                              Ajustar Marcadores
+                            </Button>
                           </div>
-
-                          <div className="mt-3">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                                Intensidade
-                              </span>
-                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden shadow-inner">
-                                <div
-                                  className={cn(
-                                    'h-full transition-all duration-500',
-                                    getIntensityColor(pt.intensity || 5),
-                                  )}
-                                  style={{ width: `${(pt.intensity / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-bold text-foreground">
-                                {pt.intensity}/10
-                              </span>
-                            </div>
-
-                            {pt.notes && (
-                              <p className="text-xs text-muted-foreground/90 line-clamp-2 mt-2.5 italic border-l-2 border-primary/20 pl-2">
-                                "{pt.notes}"
-                              </p>
-                            )}
-
-                            {pt.pathologies?.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-border/50">
-                                {pt.pathologies.map((p: string) => (
-                                  <Badge
-                                    key={p}
-                                    variant="secondary"
-                                    className="text-[9px] px-1.5 py-0 h-4.5 bg-muted/60 text-muted-foreground font-medium"
-                                  >
-                                    {p}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Adicione um ponto primeiro para poder ajustá-lo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : isLockedByOther() ? (
+                      <Button size="sm" variant="outline" disabled className="opacity-80">
+                        Sendo editado por {data.patient?.expand?.locked_by?.name || 'outro'}
+                      </Button>
+                    ) : isAdjusting ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={cancelAdjusting}
+                          disabled={isSavingAdjustments}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button size="sm" onClick={saveAdjustments} disabled={isSavingAdjustments}>
+                          {isSavingAdjustments && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          {isSavingAdjustments ? 'Salvando...' : 'Concluir'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={startAdjusting}>
+                        Ajustar Marcadores
+                      </Button>
                     )}
                   </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="p-6 bg-slate-950 flex items-center justify-center">
+                  <div
+                    ref={containerRef}
+                    className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none"
+                  >
+                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
+                    <img
+                      src={bodyImage}
+                      alt="Anatomia Muscular (Costas)"
+                      className={cn(
+                        'w-full h-full object-cover pointer-events-none transition-all duration-500',
+                        isAdjusting && 'opacity-80 grayscale-[30%] brightness-75',
+                      )}
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+                      }}
+                    />
 
-            <div className="md:col-span-3 mt-2">
-              <Card className="glass-panel border-0 shadow-lg">
+                    {!isAdjusting &&
+                      data.anatomyRegions.map((region: any) => {
+                        const isActive = data.points.some((p: any) => p.name === region.name)
+                        if (isActive) return null
+
+                        return (
+                          <div
+                            key={region.id}
+                            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
+                            style={{
+                              left: `${region.x}%`,
+                              top: `${region.y}%`,
+                              width: `${region.w}%`,
+                              height: `${region.h}%`,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRegionClick(region, null)
+                            }}
+                          />
+                        )
+                      })}
+
+                    {(isAdjusting ? draftPoints : data.points).map((pt: any) => {
+                      const region = data.anatomyRegions.find((r: any) => r.name === pt.name)
+                      const w = region ? region.w : 10
+                      const h = region ? region.h : 10
+                      const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
+
+                      const PointElement = (
+                        <div
+                          key={pt.id}
+                          onPointerDown={(e) => {
+                            if (!isAdjusting) return
+                            e.preventDefault()
+                            e.stopPropagation()
+                            e.currentTarget.setPointerCapture(e.pointerId)
+                            setDraggingPointId(pt.id)
+                          }}
+                          onPointerMove={(e) => {
+                            if (!isAdjusting || draggingPointId !== pt.id || !containerRef.current)
+                              return
+                            const rect = containerRef.current.getBoundingClientRect()
+                            let x = ((e.clientX - rect.left) / rect.width) * 100
+                            let y = ((e.clientY - rect.top) / rect.height) * 100
+                            x = Number(Math.max(0, Math.min(100, x)).toFixed(1))
+                            y = Number(Math.max(0, Math.min(100, y)).toFixed(1))
+                            setDraftPoints((prev) =>
+                              prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
+                            )
+                          }}
+                          onPointerUp={(e) => {
+                            if (!isAdjusting || draggingPointId !== pt.id) return
+                            e.currentTarget.releasePointerCapture(e.pointerId)
+                            setDraggingPointId(null)
+                          }}
+                          className={cn(
+                            'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
+                            isAdjusting ? 'cursor-move z-30' : 'cursor-pointer z-20',
+                            isAdjusting
+                              ? draggingPointId === pt.id
+                                ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
+                                : 'bg-yellow-400/40 shadow-[0_0_10px_5px_rgba(250,204,21,0.4)] border-2 border-yellow-400/80'
+                              : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
+                            isAdjusting &&
+                              draggingPointId &&
+                              draggingPointId !== pt.id &&
+                              'opacity-50',
+                          )}
+                          style={{
+                            left: `${pt.x}%`,
+                            top: `${pt.y}%`,
+                            width: `${w}%`,
+                            height: `${h}%`,
+                            touchAction: isAdjusting ? 'none' : 'auto',
+                          }}
+                          onClick={(e) => {
+                            if (isAdjusting) return
+                            e.stopPropagation()
+                            handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
+                          }}
+                        >
+                          {isAdjusting && draggingPointId === pt.id && (
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
+                              {pt.x.toFixed(1)}%, {pt.y.toFixed(1)}%
+                            </div>
+                          )}
+                        </div>
+                      )
+
+                      if (isAdjusting) return PointElement
+
+                      return (
+                        <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
+                          <HoverCardTrigger asChild>{PointElement}</HoverCardTrigger>
+                          <HoverCardContent
+                            className="w-72 z-50 glass-panel border-border/50 p-4"
+                            align="center"
+                            side="right"
+                            sideOffset={15}
+                          >
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-start">
+                                <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
+                                  <div
+                                    className={cn(
+                                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0',
+                                      getIntensityColor(pt.intensity || 5),
+                                    )}
+                                  >
+                                    {globalIndex + 1}
+                                  </div>
+                                  {pt.name}
+                                </h4>
+                                <Badge
+                                  className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
+                                >
+                                  Nível {pt.intensity || 5}
+                                </Badge>
+                              </div>
+
+                              {pt.pathologies?.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {pt.pathologies.map((p: string) => (
+                                    <Badge
+                                      key={p}
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5 py-0 h-5 font-medium bg-muted/80"
+                                    >
+                                      {p}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              {pt.notes ? (
+                                <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50 line-clamp-3 leading-relaxed">
+                                  {pt.notes}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-muted-foreground italic opacity-70">
+                                  Sem observações clínicas.
+                                </p>
+                              )}
+
+                              <div className="pt-2 border-t flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    remove(pt.id)
+                                  }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setForm({ ...pt, pathologies: pt.pathologies || [] })
+                                    setIsOpen(true)
+                                  }}
+                                >
+                                  Editar Detalhes
+                                </Button>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-panel border-0 shadow-lg flex flex-col h-full">
                 <CardHeader className="bg-background/50 border-b pb-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    Histórico de Alterações
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    Pontos Ativos
+                    <Badge variant="outline" className="ml-2 font-normal bg-background shadow-sm">
+                      {data.points.length} Total
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[200px] w-full">
-                    {data.actionLogs && data.actionLogs.length > 0 ? (
-                      <div className="divide-y divide-border/50">
-                        {data.actionLogs.map((log: any) => (
+                <CardContent className="flex-1 p-0 overflow-hidden bg-gradient-to-b from-transparent to-muted/10">
+                  <ScrollArea className="h-[600px] w-full">
+                    <div className="p-4 space-y-3">
+                      {data.points.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-16 flex flex-col items-center">
+                          <div className="bg-muted/30 p-4 rounded-full mb-4">
+                            <MapPin className="h-8 w-8 text-primary/40" strokeWidth={1.5} />
+                          </div>
+                          <p className="text-base font-semibold text-foreground">
+                            Nenhum ponto registrado.
+                          </p>
+                          <p className="text-sm opacity-80 mt-2 max-w-[280px]">
+                            Clique na imagem anatômica para adicionar um novo ponto de dor e iniciar
+                            o mapeamento.
+                          </p>
+                        </div>
+                      ) : (
+                        data.points.map((pt: any, index: number) => (
                           <div
-                            key={log.id}
-                            className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors"
+                            key={pt.id}
+                            className="p-3.5 bg-background border border-border/50 rounded-xl text-sm relative group shadow-sm hover:shadow-md transition-all duration-300 hover:border-primary/30"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
-                                {log.expand?.user_id?.name?.substring(0, 2).toUpperCase() || 'U'}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 h-7 w-7 transition-opacity hover:bg-destructive/10"
+                              onClick={() => remove(pt.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+
+                            <div className="font-bold flex gap-2.5 items-center text-foreground pr-8">
+                              <div
+                                className={cn(
+                                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm',
+                                  getIntensityColor(pt.intensity || 5),
+                                )}
+                              >
+                                {index + 1}
                               </div>
-                              <div>
-                                <p className="text-sm font-medium text-foreground">
-                                  {log.expand?.user_id?.name || 'Usuário desconhecido'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Ajustou as posições dos marcadores
-                                </p>
-                              </div>
+                              <span className="truncate text-sm">
+                                {pt.name || 'Ponto não nomeado'}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-md">
-                              {new Date(log.created).toLocaleString('pt-BR', {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}
+
+                            <div className="mt-3">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                                  Intensidade
+                                </span>
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden shadow-inner">
+                                  <div
+                                    className={cn(
+                                      'h-full transition-all duration-500',
+                                      getIntensityColor(pt.intensity || 5),
+                                    )}
+                                    style={{ width: `${(pt.intensity / 10) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-bold text-foreground">
+                                  {pt.intensity}/10
+                                </span>
+                              </div>
+
+                              {pt.notes && (
+                                <p className="text-xs text-muted-foreground/90 line-clamp-2 mt-2.5 italic border-l-2 border-primary/20 pl-2">
+                                  "{pt.notes}"
+                                </p>
+                              )}
+
+                              {pt.pathologies?.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-border/50">
+                                  {pt.pathologies.map((p: string) => (
+                                    <Badge
+                                      key={p}
+                                      variant="secondary"
+                                      className="text-[9px] px-1.5 py-0 h-4.5 bg-muted/60 text-muted-foreground font-medium"
+                                    >
+                                      {p}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        Nenhuma alteração registrada recentemente.
-                      </div>
-                    )}
+                        ))
+                      )}
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="notes" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row justify-between items-center">
-                <CardTitle>Prontuário Médico</CardTitle>
-                <div className="flex flex-wrap gap-2 justify-end">
-                  <ProtocolModal patientId={id!} onSuccess={load} />
-                  <ProcedureModal patientId={id!} onAdd={load} />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {data.notes.length > 0 ? (
-                  <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-6 py-4">
-                    {data.notes.map((n: any) => {
-                      const prof = users.find((u) => u.id === n.professionalId)
-                      return (
-                        <div key={n.id} className="relative">
-                          <div className="absolute -left-[33px] bg-background border-2 border-primary w-4 h-4 rounded-full mt-1.5" />
-                          <div
-                            className={cn(
-                              'p-4 border rounded-lg shadow-sm transition-colors',
-                              n.is_signed ? 'bg-slate-50 dark:bg-slate-900/50' : 'bg-card',
-                            )}
-                          >
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 border-b pb-3">
-                              <div>
-                                <div className="font-semibold text-primary flex items-center gap-2">
-                                  {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
-                                  <span className="text-xs font-normal text-muted-foreground">
-                                    {new Date(n.date || n.created).toLocaleDateString()}
-                                  </span>
+              <div className="md:col-span-3 mt-2">
+                <Card className="glass-panel border-0 shadow-lg">
+                  <CardHeader className="bg-background/50 border-b pb-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      Histórico de Alterações
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[200px] w-full">
+                      {data.actionLogs && data.actionLogs.length > 0 ? (
+                        <div className="divide-y divide-border/50">
+                          {data.actionLogs.map((log: any) => (
+                            <div
+                              key={log.id}
+                              className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
+                                  {log.expand?.user_id?.name?.substring(0, 2).toUpperCase() || 'U'}
                                 </div>
-                                <div className="text-sm text-muted-foreground mt-0.5">
-                                  Profissional:{' '}
-                                  <span className="font-medium text-foreground">
-                                    {prof?.name ||
-                                      prof?.email ||
-                                      n.professionalId ||
-                                      'Não identificado'}
-                                  </span>
+                                <div>
+                                  <p className="text-sm font-medium text-foreground">
+                                    {log.expand?.user_id?.name || 'Usuário desconhecido'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Ajustou as posições dos marcadores
+                                  </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handlePrintNote(n)}
-                                >
-                                  <Printer className="w-4 h-4 mr-2" /> PDF
-                                </Button>
-                                {n.is_signed ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
-                                  >
-                                    <Check className="w-3 h-3" /> Assinado
-                                  </Badge>
-                                ) : (
+                              <div className="text-xs text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-md">
+                                {new Date(log.created).toLocaleString('pt-BR', {
+                                  dateStyle: 'short',
+                                  timeStyle: 'short',
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          Nenhuma alteração registrada recentemente.
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
+
+          {user?.role !== 'receptionist' && (
+            <TabsContent value="notes" className="mt-4">
+              <Card>
+                <CardHeader className="flex flex-row justify-between items-center">
+                  <CardTitle>Prontuário Médico</CardTitle>
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <ProtocolModal patientId={id!} onSuccess={load} />
+                    <ProcedureModal patientId={id!} onAdd={load} />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {data.notes.length > 0 ? (
+                    <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-6 py-4">
+                      {data.notes.map((n: any) => {
+                        const prof = users.find((u) => u.id === n.professionalId)
+                        return (
+                          <div key={n.id} className="relative">
+                            <div className="absolute -left-[33px] bg-background border-2 border-primary w-4 h-4 rounded-full mt-1.5" />
+                            <div
+                              className={cn(
+                                'p-4 border rounded-lg shadow-sm transition-colors',
+                                n.is_signed ? 'bg-slate-50 dark:bg-slate-900/50' : 'bg-card',
+                              )}
+                            >
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 border-b pb-3">
+                                <div>
+                                  <div className="font-semibold text-primary flex items-center gap-2">
+                                    {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
+                                    <span className="text-xs font-normal text-muted-foreground">
+                                      {new Date(n.date || n.created).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-0.5">
+                                    Profissional:{' '}
+                                    <span className="font-medium text-foreground">
+                                      {prof?.name ||
+                                        prof?.email ||
+                                        n.professionalId ||
+                                        'Não identificado'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2 sm:mt-0">
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setNoteToSign(n.id)}
+                                    onClick={() => handlePrintNote(n)}
                                   >
-                                    Assinar
+                                    <Printer className="w-4 h-4 mr-2" /> PDF
                                   </Button>
-                                )}
+                                  {n.is_signed ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
+                                    >
+                                      <Check className="w-3 h-3" /> Assinado
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setNoteToSign(n.id)}
+                                    >
+                                      Assinar
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
+                              <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90 leading-relaxed">
+                                {n.content}
+                              </p>
+                              {n.is_signed && n.signature_hash && (
+                                <div className="mt-4 pt-3 border-t border-border/50">
+                                  <p className="text-xs text-muted-foreground font-mono">
+                                    <span className="font-semibold">Assinado em:</span>{' '}
+                                    {new Date(n.signed_at).toLocaleString()}{' '}
+                                    <br className="sm:hidden" />
+                                    <span className="hidden sm:inline">•</span>{' '}
+                                    <span className="font-semibold">Hash:</span> {n.signature_hash}
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                            <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90 leading-relaxed">
-                              {n.content}
-                            </p>
-                            {n.is_signed && n.signature_hash && (
-                              <div className="mt-4 pt-3 border-t border-border/50">
-                                <p className="text-xs text-muted-foreground font-mono">
-                                  <span className="font-semibold">Assinado em:</span>{' '}
-                                  {new Date(n.signed_at).toLocaleString()}{' '}
-                                  <br className="sm:hidden" />
-                                  <span className="hidden sm:inline">•</span>{' '}
-                                  <span className="font-semibold">Hash:</span> {n.signature_hash}
-                                </p>
-                              </div>
-                            )}
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
-                    <div className="bg-muted/30 p-4 rounded-full mb-4">
-                      <Activity className="h-8 w-8 text-primary/40" />
+                        )
+                      })}
                     </div>
-                    <p className="text-base font-medium">
-                      Nenhum prontuário registrado para este paciente.
-                    </p>
-                    <p className="text-sm opacity-80 mt-1">
-                      Adicione uma nota ou procedimento para começar.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
+                      <div className="bg-muted/30 p-4 rounded-full mb-4">
+                        <Activity className="h-8 w-8 text-primary/40" />
+                      </div>
+                      <p className="text-base font-medium">
+                        Nenhum prontuário registrado para este paciente.
+                      </p>
+                      <p className="text-sm opacity-80 mt-1">
+                        Adicione uma nota ou procedimento para começar.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="appointments" className="mt-4">
             <Card>
@@ -1163,107 +1178,116 @@ export default function PatientRecord() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="inventory" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row justify-between items-center">
-                <div>
-                  <CardTitle>Materiais Utilizados</CardTitle>
-                  <CardDescription>Histórico de consumo e rastreabilidade de lotes</CardDescription>
-                </div>
-                <Button onClick={() => setUsageModalOpen(true)}>
-                  <Package className="mr-2 h-4 w-4" /> Registrar Uso
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {data.usages && data.usages.length > 0 ? (
-                  <div className="space-y-4">
-                    {data.usages.map((u: any) => (
-                      <div
-                        key={u.id}
-                        className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold text-primary">
-                              {u.expand?.batch_id?.expand?.material_id?.name ||
-                                'Material Desconhecido'}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Lote:{' '}
-                              <span className="font-mono">{u.expand?.batch_id?.batch_number}</span>
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Quantidade:{' '}
-                              <strong>
-                                {u.quantity_used} {u.expand?.batch_id?.expand?.material_id?.unit}
-                              </strong>
-                            </p>
+          {user?.role !== 'receptionist' && (
+            <TabsContent value="inventory" className="mt-4">
+              <Card>
+                <CardHeader className="flex flex-row justify-between items-center">
+                  <div>
+                    <CardTitle>Materiais Utilizados</CardTitle>
+                    <CardDescription>
+                      Histórico de consumo e rastreabilidade de lotes
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setUsageModalOpen(true)}>
+                    <Package className="mr-2 h-4 w-4" /> Registrar Uso
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {data.usages && data.usages.length > 0 ? (
+                    <div className="space-y-4">
+                      {data.usages.map((u: any) => (
+                        <div
+                          key={u.id}
+                          className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-semibold text-primary">
+                                {u.expand?.batch_id?.expand?.material_id?.name ||
+                                  'Material Desconhecido'}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Lote:{' '}
+                                <span className="font-mono">
+                                  {u.expand?.batch_id?.batch_number}
+                                </span>
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Quantidade:{' '}
+                                <strong>
+                                  {u.quantity_used} {u.expand?.batch_id?.expand?.material_id?.unit}
+                                </strong>
+                              </p>
+                            </div>
+                            <div className="text-right text-sm text-muted-foreground">
+                              <p>{new Date(u.usage_date).toLocaleDateString()}</p>
+                              <p>
+                                Profissional:{' '}
+                                {u.expand?.professional_id?.name ||
+                                  u.expand?.professional_id?.email}
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right text-sm text-muted-foreground">
-                            <p>{new Date(u.usage_date).toLocaleDateString()}</p>
-                            <p>
-                              Profissional:{' '}
-                              {u.expand?.professional_id?.name || u.expand?.professional_id?.email}
-                            </p>
-                          </div>
+                          {u.notes && (
+                            <p className="text-sm mt-3 italic text-muted-foreground">"{u.notes}"</p>
+                          )}
                         </div>
-                        {u.notes && (
-                          <p className="text-sm mt-3 italic text-muted-foreground">"{u.notes}"</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhum material registrado para este paciente.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhum material registrado para este paciente.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
-          <TabsContent value="evolution" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Evolução da Dor</CardTitle>
-                <CardDescription>
-                  Histórico de intensidade reportada ao longo do tempo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {chartData.length > 0 ? (
-                  <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                    <LineChart
-                      data={chartData}
-                      margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="hsl(var(--border))"
-                      />
-                      <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} />
-                      <YAxis tickLine={false} axisLine={false} tickMargin={10} domain={[1, 10]} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="intensity"
-                        stroke="var(--color-intensity)"
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: 'var(--color-intensity)' }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[350px] text-muted-foreground">
-                    <Activity className="h-12 w-12 mb-4 opacity-20" />
-                    <p>Nenhum dado de dor registrado para gerar o gráfico.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {user?.role !== 'receptionist' && (
+            <TabsContent value="evolution" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Evolução da Dor</CardTitle>
+                  <CardDescription>
+                    Histórico de intensidade reportada ao longo do tempo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {chartData.length > 0 ? (
+                    <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                      <LineChart
+                        data={chartData}
+                        margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="hsl(var(--border))"
+                        />
+                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={10} domain={[1, 10]} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line
+                          type="monotone"
+                          dataKey="intensity"
+                          stroke="var(--color-intensity)"
+                          strokeWidth={2}
+                          dot={{ r: 4, fill: 'var(--color-intensity)' }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[350px] text-muted-foreground">
+                      <Activity className="h-12 w-12 mb-4 opacity-20" />
+                      <p>Nenhum dado de dor registrado para gerar o gráfico.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
