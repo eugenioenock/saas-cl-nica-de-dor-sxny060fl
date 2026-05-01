@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { format, isBefore, subDays } from 'date-fns'
-import { PenLine, Loader2, AlertTriangle, ArrowRight } from 'lucide-react'
+import { PenLine, Loader2, AlertTriangle, ArrowRight, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -25,6 +26,7 @@ import { useAuth } from '@/hooks/use-auth'
 
 export default function SignatureAudit() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [notes, setNotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [clinics, setClinics] = useState<any[]>([])
@@ -77,11 +79,17 @@ export default function SignatureAudit() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Auditoria de Assinaturas</h1>
-          <p className="text-muted-foreground">
-            Monitore os prontuários concluídos que ainda estão pendentes de assinatura do paciente.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Auditoria de Assinaturas</h1>
+            <p className="text-muted-foreground">
+              Monitore os prontuários concluídos que ainda estão pendentes de assinatura do
+              paciente.
+            </p>
+          </div>
         </div>
       </div>
 

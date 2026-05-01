@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -22,7 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ShieldAlert, Trash2, Loader2, Download, Check, X } from 'lucide-react'
+import { ShieldAlert, Trash2, Loader2, Download, Check, X, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface User {
@@ -49,6 +49,7 @@ interface AccessRecord {
 
 export default function SettingsAccessControl() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [users, setUsers] = useState<User[]>([])
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [accessRecords, setAccessRecords] = useState<AccessRecord[]>([])
@@ -167,14 +168,19 @@ export default function SettingsAccessControl() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between gap-4 md:items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ShieldAlert className="h-8 w-8 text-primary" />
-            Controle de Acessos
-          </h1>
-          <p className="text-muted-foreground">
-            Aprove pendências e gerencie as unidades de cada usuário ativo.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <ShieldAlert className="h-8 w-8 text-primary" />
+              Controle de Acessos
+            </h1>
+            <p className="text-muted-foreground">
+              Aprove pendências e gerencie as unidades de cada usuário ativo.
+            </p>
+          </div>
         </div>
       </div>
 

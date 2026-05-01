@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
-import { Loader2, Save, MapPin } from 'lucide-react'
+import { Loader2, Save, MapPin, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import bodyImage from '@/assets/corpo-humano-a2474.jpg'
@@ -93,6 +93,7 @@ const DEFAULT_POINTS = [
 
 export default function AnatomicalModelEditor() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [template, setTemplate] = useState<any>(null)
   const [points, setPoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -221,11 +222,16 @@ export default function AnatomicalModelEditor() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Modelo Anatômico Master</h1>
-          <p className="text-muted-foreground">
-            Configure as posições globais padrão para os marcadores de dor
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Modelo Anatômico Master</h1>
+            <p className="text-muted-foreground">
+              Configure as posições globais padrão para os marcadores de dor
+            </p>
+          </div>
         </div>
         <Button id="save-model-btn" onClick={saveModel} disabled={saving}>
           {saving ? (

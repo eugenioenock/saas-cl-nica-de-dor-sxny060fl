@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Mail, Trash2, CalendarClock } from 'lucide-react'
+import { Loader2, Plus, Mail, Trash2, CalendarClock, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ReportSchedule {
@@ -46,6 +47,7 @@ interface ReportSchedule {
 
 export default function SettingsReports() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [schedules, setSchedules] = useState<ReportSchedule[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -140,14 +142,19 @@ export default function SettingsReports() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between gap-4 md:items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <CalendarClock className="h-8 w-8 text-primary" />
-            Relatórios Automáticos
-          </h1>
-          <p className="text-muted-foreground">
-            Configure o envio agendado de relatórios gerenciais para parceiros e contabilidade.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <CalendarClock className="h-8 w-8 text-primary" />
+              Relatórios Automáticos
+            </h1>
+            <p className="text-muted-foreground">
+              Configure o envio agendado de relatórios gerenciais para parceiros e contabilidade.
+            </p>
+          </div>
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

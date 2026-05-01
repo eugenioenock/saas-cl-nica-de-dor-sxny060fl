@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Navigate } from 'react-router-dom'
-import { FileText, Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { FileText, Plus, Pencil, Trash2, X, ArrowLeft } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function FranchiseTemplates() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [templates, setTemplates] = useState<any[]>([])
   const [inventory, setInventory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -173,14 +174,19 @@ export default function FranchiseTemplates() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <FileText className="h-8 w-8 text-primary" />
-            Templates & Protocolos
-          </h1>
-          <p className="text-muted-foreground">
-            Gerencie padrões de consulta, protocolos clínicos e configurações.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <FileText className="h-8 w-8 text-primary" />
+              Templates & Protocolos
+            </h1>
+            <p className="text-muted-foreground">
+              Gerencie padrões de consulta, protocolos clínicos e configurações.
+            </p>
+          </div>
         </div>
         <Button onClick={() => openDialog()}>
           <Plus className="h-4 w-4 mr-2" /> Novo Template

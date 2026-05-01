@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Navigate } from 'react-router-dom'
-import { ArrowRightLeft, Plus, CheckCircle, XCircle } from 'lucide-react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { ArrowRightLeft, Plus, CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,7 @@ import { toast } from 'sonner'
 
 export default function FranchiseTransfers() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [transfers, setTransfers] = useState<any[]>([])
   const [clinics, setClinics] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,14 +151,19 @@ export default function FranchiseTransfers() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ArrowRightLeft className="h-8 w-8 text-primary" />
-            Transferências entre Unidades
-          </h1>
-          <p className="text-muted-foreground">
-            Solicitações de movimentação de pacientes e lotes de estoque.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <ArrowRightLeft className="h-8 w-8 text-primary" />
+              Transferências entre Unidades
+            </h1>
+            <p className="text-muted-foreground">
+              Solicitações de movimentação de pacientes e lotes de estoque.
+            </p>
+          </div>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Nova Solicitação

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,12 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Database, Loader2, AlertTriangle } from 'lucide-react'
+import { Database, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function SettingsMaintenance() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [clinics, setClinics] = useState<any[]>([])
   const [selectedClinic, setSelectedClinic] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -75,14 +76,19 @@ export default function SettingsMaintenance() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Database className="h-8 w-8 text-primary" />
-          Manutenção de Dados
-        </h1>
-        <p className="text-muted-foreground">
-          Ferramentas avançadas para integridade do banco de dados.
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Database className="h-8 w-8 text-primary" />
+            Manutenção de Dados
+          </h1>
+          <p className="text-muted-foreground">
+            Ferramentas avançadas para integridade do banco de dados.
+          </p>
+        </div>
       </div>
 
       <Card>

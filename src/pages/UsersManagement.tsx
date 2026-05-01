@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -38,7 +39,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { Plus, Search, ShieldCheck } from 'lucide-react'
+import { Plus, Search, ShieldCheck, ArrowLeft } from 'lucide-react'
 
 const userSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -52,6 +53,7 @@ type UserFormValues = z.infer<typeof userSchema>
 
 export default function UsersManagement() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -131,11 +133,16 @@ export default function UsersManagement() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestão de Usuários</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie o acesso e permissões da equipe clínica.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestão de Usuários</h1>
+            <p className="text-muted-foreground mt-1">
+              Gerencie o acesso e permissões da equipe clínica.
+            </p>
+          </div>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>

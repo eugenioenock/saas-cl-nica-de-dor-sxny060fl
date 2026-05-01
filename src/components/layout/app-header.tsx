@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { Building2, Search, Bell, User, Loader2, CheckCheck, Moon, Sun } from 'lucide-react'
+import { Building2, Search, Bell, User, Loader2, CheckCheck, Moon, Sun, LogOut } from 'lucide-react'
 import { useAppContext } from '@/hooks/use-app-context'
 import { useTheme } from '@/components/theme-provider'
+import { useAuth } from '@/hooks/use-auth'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,6 +57,7 @@ const routeMap: Record<string, string> = {
 
 export function AppHeader() {
   const { activeClinic, activeFranchise, currentUser, clinics, setActiveClinic } = useAppContext()
+  const { signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -361,7 +363,14 @@ export function AppHeader() {
               Meu Perfil
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:bg-destructive/10 py-2.5 cursor-pointer rounded-lg mx-1">
+            <DropdownMenuItem
+              className="text-destructive focus:bg-destructive/10 py-2.5 cursor-pointer rounded-lg mx-1"
+              onClick={() => {
+                signOut()
+                navigate('/login')
+              }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>

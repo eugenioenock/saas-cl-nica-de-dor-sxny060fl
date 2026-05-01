@@ -17,6 +17,7 @@ import {
   ArrowRightLeft,
   PenLine,
   BookOpen,
+  LogOut,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -46,7 +47,7 @@ type NavGroup = {
 
 export function AppSidebar() {
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const role = user?.role || 'pending'
 
   const getDashUrl = () => {
@@ -293,13 +294,20 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-2">
         <div className="rounded-xl bg-muted/50 p-4 border border-border/50">
           <p className="text-xs font-semibold text-foreground mb-1">SpineCare OS</p>
           <p className="text-[10px] text-muted-foreground capitalize">
             {role === 'pending' ? 'Carregando...' : `Papel: ${role}`}
           </p>
         </div>
+        <SidebarMenuButton
+          onClick={() => signOut()}
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          <span>Sair da conta</span>
+        </SidebarMenuButton>
       </SidebarFooter>
     </Sidebar>
   )

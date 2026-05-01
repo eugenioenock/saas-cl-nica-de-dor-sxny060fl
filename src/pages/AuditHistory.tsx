@@ -22,10 +22,11 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
-import { Activity, RefreshCcw } from 'lucide-react'
+import { Activity, RefreshCcw, ArrowLeft } from 'lucide-react'
 
 export default function AuditHistory() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const [logs, setLogs] = useState<any[]>([])
   const [clinics, setClinics] = useState<any[]>([])
@@ -94,9 +95,14 @@ export default function AuditHistory() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Histórico de Auditoria</h1>
-          <p className="text-muted-foreground">Log centralizado de ações críticas no sistema.</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Histórico de Auditoria</h1>
+            <p className="text-muted-foreground">Log centralizado de ações críticas no sistema.</p>
+          </div>
         </div>
         <Button variant="outline" onClick={loadLogs}>
           <RefreshCcw className="w-4 h-4 mr-2" /> Atualizar

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import {
@@ -20,10 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
 export default function ReportsPerformance() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any[]>([])
   const [materials, setMaterials] = useState<any[]>([])
@@ -90,11 +92,16 @@ export default function ReportsPerformance() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Desempenho e Consumo</h1>
-        <p className="text-muted-foreground">
-          Análise de eficiência do uso de materiais por profissional.
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Desempenho e Consumo</h1>
+          <p className="text-muted-foreground">
+            Análise de eficiência do uso de materiais por profissional.
+          </p>
+        </div>
       </div>
 
       <Card>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
@@ -12,7 +12,16 @@ import {
 } from '@/components/ui/select'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import { DollarSign, Calendar, Package, MapPin, Trophy, Award, Medal } from 'lucide-react'
+import {
+  DollarSign,
+  Calendar,
+  Package,
+  MapPin,
+  Trophy,
+  Award,
+  Medal,
+  ArrowLeft,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Table,
@@ -29,6 +38,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 
 export default function UnitsComparison() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [regionFilter, setRegionFilter] = useState('all')
   const [sortBy, setSortBy] = useState('xp')
 
@@ -137,11 +147,16 @@ export default function UnitsComparison() {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Ranking Regional</h1>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Gamificação e desempenho operacional das unidades.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Ranking Regional</h1>
+            <p className="text-muted-foreground text-sm md:text-base">
+              Gamificação e desempenho operacional das unidades.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {regions.length > 0 && (

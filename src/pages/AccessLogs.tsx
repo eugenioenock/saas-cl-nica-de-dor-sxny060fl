@@ -10,12 +10,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import { ptBR } from 'date-fns/locale'
-import { Activity, ShieldAlert } from 'lucide-react'
+import { Activity, ShieldAlert, ArrowLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 export default function AccessLogs() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -41,6 +44,9 @@ export default function AccessLogs() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <ShieldAlert className="h-6 w-6" />
         </div>
