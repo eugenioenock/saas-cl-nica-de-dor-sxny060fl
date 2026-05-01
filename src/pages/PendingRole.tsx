@@ -2,7 +2,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ShieldAlert, RefreshCw } from 'lucide-react'
+import { ShieldAlert, Loader2 } from 'lucide-react'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useEffect, useState } from 'react'
 import pb from '@/lib/pocketbase/client'
@@ -48,7 +48,7 @@ export default function PendingRole() {
         try {
           await refreshUser()
           toast.success('Role updated! Redirecting...')
-          navigate(location.state?.from?.pathname || '/')
+          navigate(location.state?.from?.pathname || '/agenda')
         } catch (error) {
           console.error('Error refreshing auth:', error)
         }
@@ -68,7 +68,7 @@ export default function PendingRole() {
         updatedUser.status === 'active'
       ) {
         toast.success('Role updated! Redirecting...')
-        navigate(location.state?.from?.pathname || '/')
+        navigate(location.state?.from?.pathname || '/agenda')
       } else {
         toast.info('Still pending role assignment. Please wait for an administrator.')
       }
@@ -84,7 +84,7 @@ export default function PendingRole() {
     return <Navigate to="/pending-approval" replace state={location.state} />
   }
   if (user.role && (user.role === 'admin' || user.clinic_id) && user.status === 'active') {
-    return <Navigate to={location.state?.from?.pathname || '/'} replace />
+    return <Navigate to={location.state?.from?.pathname || '/agenda'} replace />
   }
 
   return (
@@ -137,7 +137,7 @@ export default function PendingRole() {
               className="w-full h-11 text-slate-500 hover:text-slate-700 rounded-xl"
               disabled={isRefreshing}
             >
-              {isRefreshing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Check Status
             </Button>
           </div>
