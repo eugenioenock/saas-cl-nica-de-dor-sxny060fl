@@ -48,7 +48,10 @@ export default function PendingRole() {
         try {
           await refreshUser()
           toast.success('Role updated! Redirecting...')
-          navigate(location.state?.from?.pathname || '/agenda')
+          navigate(
+            location.state?.from?.pathname ||
+              (e.record.role === 'admin' ? '/admin/dashboard' : '/agenda'),
+          )
         } catch (error) {
           console.error('Error refreshing auth:', error)
         }
@@ -67,8 +70,12 @@ export default function PendingRole() {
         (updatedUser.role === 'admin' || updatedUser.clinic_id) &&
         updatedUser.status === 'active'
       ) {
-        toast.success('Role updated! Redirecting...')
-        navigate(location.state?.from?.pathname || '/agenda')
+        toast.success('Access granted! Redirecting...')
+        navigate(
+          location.state?.from?.pathname ||
+            (updatedUser.role === 'admin' ? '/admin/dashboard' : '/agenda'),
+          { replace: true },
+        )
       } else {
         toast.info('Still pending role assignment. Please wait for an administrator.')
       }
@@ -84,7 +91,14 @@ export default function PendingRole() {
     return <Navigate to="/pending-approval" replace state={location.state} />
   }
   if (user.role && (user.role === 'admin' || user.clinic_id) && user.status === 'active') {
-    return <Navigate to={location.state?.from?.pathname || '/agenda'} replace />
+    return (
+      <Navigate
+        to={
+          location.state?.from?.pathname || (user.role === 'admin' ? '/admin/dashboard' : '/agenda')
+        }
+        replace
+      />
+    )
   }
 
   return (

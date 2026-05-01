@@ -68,7 +68,8 @@ const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactN
     return <Navigate to="/pending-approval" replace state={{ from: location }} />
   }
 
-  if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
+  const hasValidRole = user.role === 'admin' || (user.role && user.clinic_id)
+  if (!hasValidRole) {
     return <Navigate to="/pending-role" replace state={{ from: location }} />
   }
 
@@ -88,7 +89,8 @@ const RouteDispatcher = () => {
     return <Navigate to="/pending-approval" replace state={{ from: location }} />
   }
 
-  if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
+  const hasValidRole = user.role === 'admin' || (user.role && user.clinic_id)
+  if (!hasValidRole) {
     return <Navigate to="/pending-role" replace state={{ from: location }} />
   }
 
