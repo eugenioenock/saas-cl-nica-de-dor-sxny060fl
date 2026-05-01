@@ -40,7 +40,7 @@ const DEFAULT_ANATOMY_REGIONS = [
 ]
 
 export function BodyMap({ patientId }: { patientId: string }) {
-  const view = 'back'
+  const [currentView, setCurrentView] = useState<'front' | 'back'>('back')
   const [points, setPoints] = useState<any[]>([])
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,7 +104,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
           patient_id: patientId,
           x: region.x,
           y: region.y,
-          view: region.view,
+          view: region.view || currentView,
           name: region.name,
           pathologies: [],
           notes: '',
@@ -169,7 +169,7 @@ export function BodyMap({ patientId }: { patientId: string }) {
     }
   }
 
-  const displayedPointsPanel = points
+  const displayedPointsPanel = points.filter((p: any) => (p.view || 'back') === currentView)
 
   if (loading)
     return (
@@ -179,75 +179,138 @@ export function BodyMap({ patientId }: { patientId: string }) {
       </div>
     )
 
+  const handleMapClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Number(
+      Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)).toFixed(1),
+    )
+    const y = Number(
+      Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)).toFixed(1),
+    )
+
+    try {
+      await pb.collection('pain_points').create({
+        patient_id: patientId,
+        x,
+        y,
+        view: currentView,
+        name: 'Ponto Personalizado',
+        pathologies: [],
+        notes: '',
+        intensity: 5,
+      })
+      toast.success('Ponto adicionado!')
+    } catch (err) {
+      toast.error('Erro ao adicionar ponto')
+    }
+  }
+
   return (
-    <div className="grid lg:grid-cols-2 gap-6 h-[600px]">
+    <div className="grid lg:grid-cols-2 gap-6 h-[600px] relative">
+      <div className="absolute top-4 left-4 z-50 flex bg-muted/80 backdrop-blur p-1 rounded-lg border border-border/50">
+        <Button
+          size="sm"
+          variant={currentView === 'front' ? 'default' : 'ghost'}
+          onClick={() => setCurrentView('front')}
+          className="h-7 text-xs"
+        >
+          Frente
+        </Button>
+        <Button
+          size="sm"
+          variant={currentView === 'back' ? 'default' : 'ghost'}
+          onClick={() => setCurrentView('back')}
+          className="h-7 text-xs"
+        >
+          Costas
+        </Button>
+      </div>
       <div className="relative border rounded-xl bg-slate-950 flex flex-col overflow-hidden shadow-inner">
         <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
-          <div className="relative w-full max-w-[260px] aspect-[1/2] rounded-lg overflow-hidden">
+          <div
+            className="relative w-full max-w-[260px] aspect-[1/2] rounded-lg overflow-hidden cursor-crosshair"
+            onClick={handleMapClick}
+          >
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
             <img
-              src={bodyImage}
-              alt="Anatomia Muscular (Costas)"
+              src={
+                currentView === 'back'
+                  ? bodyImage
+                  : 'https://img.usecurling.com/p/600/1200?q=anatomy%20front%20muscles&color=cyan'
+              }
+              alt={
+                currentView === 'back' ? 'Anatomia Muscular (Costas)' : 'Anatomia Muscular (Frente)'
+              }
               className="w-full h-full object-cover pointer-events-none transition-opacity duration-500"
               onError={(e) => {
                 e.currentTarget.src =
-                  'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+                  currentView === 'back'
+                    ? 'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+                    : 'https://img.usecurling.com/p/600/1200?q=anatomy%20front%20muscles&color=cyan'
               }}
             />
 
-            {anatomyRegions.map((region: any) => {
-              const isActive = points.some((p: any) => p.name === region.name)
-              if (isActive) return null
+            {anatomyRegions
+              .filter((r: any) => (r.view || 'back') === currentView)
+              .map((region: any) => {
+                const isActive = points.some(
+                  (p: any) => p.name === region.name && (p.view || 'back') === currentView,
+                )
+                if (isActive) return null
 
-              return (
-                <div
-                  key={region.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
-                  style={{
-                    left: `${region.x}%`,
-                    top: `${region.y}%`,
-                    width: `${region.w}%`,
-                    height: `${region.h}%`,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRegionClick(region, null)
-                  }}
-                  title={region.name}
-                />
-              )
-            })}
+                return (
+                  <div
+                    key={region.id}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
+                    style={{
+                      left: `${region.x}%`,
+                      top: `${region.y}%`,
+                      width: `${region.w}%`,
+                      height: `${region.h}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRegionClick(region, null)
+                    }}
+                    title={region.name}
+                  />
+                )
+              })}
 
-            {points.map((pt: any) => {
-              const region = anatomyRegions.find((r: any) => r.name === pt.name)
-              const w = region ? region.w : 10
-              const h = region ? region.h : 10
-              const isHovered = hoveredPointId === pt.id
+            {points
+              .filter((p: any) => (p.view || 'back') === currentView)
+              .map((pt: any) => {
+                const region = anatomyRegions.find(
+                  (r: any) => r.name === pt.name && (r.view || 'back') === currentView,
+                )
+                const w = region ? region.w : 10
+                const h = region ? region.h : 10
+                const isHovered = hoveredPointId === pt.id
 
-              return (
-                <div
-                  key={pt.id}
-                  className={cn(
-                    'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
-                    'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
-                    isHovered && 'ring-2 ring-white/50 scale-110',
-                  )}
-                  style={{
-                    left: `${pt.x}%`,
-                    top: `${pt.y}%`,
-                    width: `${w}%`,
-                    height: `${h}%`,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
-                  }}
-                  onMouseEnter={() => setHoveredPointId(pt.id)}
-                  onMouseLeave={() => setHoveredPointId(null)}
-                  title={pt.name || 'Ponto'}
-                />
-              )
-            })}
+                return (
+                  <div
+                    key={pt.id}
+                    className={cn(
+                      'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500',
+                      'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] z-20 border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
+                      isHovered && 'ring-2 ring-white/50 scale-110',
+                    )}
+                    style={{
+                      left: `${pt.x}%`,
+                      top: `${pt.y}%`,
+                      width: `${w}%`,
+                      height: `${h}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
+                    }}
+                    onMouseEnter={() => setHoveredPointId(pt.id)}
+                    onMouseLeave={() => setHoveredPointId(null)}
+                    title={pt.name || 'Ponto'}
+                  />
+                )
+              })}
           </div>
         </div>
       </div>
@@ -411,8 +474,8 @@ export function BodyMap({ patientId }: { patientId: string }) {
                         </span>
                       </div>
                       <Slider
-                        value={[p.intensity || 5]}
-                        min={1}
+                        value={[p.intensity ?? 5]}
+                        min={0}
                         max={10}
                         step={1}
                         onValueChange={([val]) => updatePoint(p.id, { intensity: val })}

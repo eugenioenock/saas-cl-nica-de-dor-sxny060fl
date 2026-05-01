@@ -98,6 +98,7 @@ export default function PatientRecord() {
   const [draftPoints, setDraftPoints] = useState<any[]>([])
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [currentView, setCurrentView] = useState<'front' | 'back'>('back')
 
   const [data, setData] = useState<any>({
     patient: null,
@@ -275,7 +276,7 @@ export default function PatientRecord() {
           name: region.name,
           x: region.x,
           y: region.y,
-          view: region.view,
+          view: region.view || currentView,
           intensity: 5,
           pathologies: [],
           notes: '',
@@ -286,6 +287,30 @@ export default function PatientRecord() {
         toast.error('Erro ao adicionar ponto')
       }
     }
+  }
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isAdjusting) return
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const x = Number(
+      Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)).toFixed(1),
+    )
+    const y = Number(
+      Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)).toFixed(1),
+    )
+
+    setForm({
+      id: '',
+      x,
+      y,
+      view: currentView,
+      name: 'Ponto Personalizado',
+      notes: '',
+      intensity: 5,
+      pathologies: [],
+    })
+    setIsOpen(true)
   }
 
   const load = async () => {
@@ -596,8 +621,28 @@ export default function PatientRecord() {
           {user?.role !== 'receptionist' && (
             <TabsContent value="map" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
               <Card className="md:col-span-2 glass-panel border-0 shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b">
-                  <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 bg-background/50 border-b flex-wrap gap-2">
+                  <div className="flex items-center gap-4">
+                    <CardTitle className="text-lg">Mapeamento Corporal</CardTitle>
+                    <div className="flex bg-muted p-1 rounded-lg">
+                      <Button
+                        size="sm"
+                        variant={currentView === 'front' ? 'default' : 'ghost'}
+                        onClick={() => setCurrentView('front')}
+                        className="h-7 text-xs px-3"
+                      >
+                        Frente
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={currentView === 'back' ? 'default' : 'ghost'}
+                        onClick={() => setCurrentView('back')}
+                        className="h-7 text-xs px-3"
+                      >
+                        Costas
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -663,196 +708,223 @@ export default function PatientRecord() {
                 <CardContent className="p-6 bg-slate-950 flex items-center justify-center">
                   <div
                     ref={containerRef}
-                    className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none"
+                    className="relative aspect-[1/2] w-full max-w-sm rounded-2xl overflow-hidden shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] select-none touch-none cursor-crosshair"
+                    onClick={handleMapClick}
                   >
                     <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/10 via-transparent to-transparent" />
                     <img
-                      src={bodyImage}
-                      alt="Anatomia Muscular (Costas)"
+                      src={
+                        currentView === 'back'
+                          ? bodyImage
+                          : 'https://img.usecurling.com/p/600/1200?q=anatomy%20front%20muscles&color=cyan'
+                      }
+                      alt={
+                        currentView === 'back'
+                          ? 'Anatomia Muscular (Costas)'
+                          : 'Anatomia Muscular (Frente)'
+                      }
                       className={cn(
                         'w-full h-full object-cover pointer-events-none transition-all duration-500',
                         isAdjusting && 'opacity-80 grayscale-[30%] brightness-75',
                       )}
                       onError={(e) => {
                         e.currentTarget.src =
-                          'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+                          currentView === 'back'
+                            ? 'https://img.usecurling.com/p/600/1200?q=anatomy%20back%20muscles&color=cyan'
+                            : 'https://img.usecurling.com/p/600/1200?q=anatomy%20front%20muscles&color=cyan'
                       }}
                     />
 
                     {!isAdjusting &&
-                      data.anatomyRegions.map((region: any) => {
-                        const isActive = data.points.some((p: any) => p.name === region.name)
-                        if (isActive) return null
+                      data.anatomyRegions
+                        .filter((r: any) => (r.view || 'back') === currentView)
+                        .map((region: any) => {
+                          const isActive = data.points.some(
+                            (p: any) =>
+                              p.name === region.name && (p.view || 'back') === currentView,
+                          )
+                          if (isActive) return null
 
-                        return (
+                          return (
+                            <div
+                              key={region.id}
+                              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
+                              style={{
+                                left: `${region.x}%`,
+                                top: `${region.y}%`,
+                                width: `${region.w}%`,
+                                height: `${region.h}%`,
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRegionClick(region, null)
+                              }}
+                            />
+                          )
+                        })}
+
+                    {(isAdjusting ? draftPoints : data.points)
+                      .filter((p: any) => (p.view || 'back') === currentView)
+                      .map((pt: any) => {
+                        const region = data.anatomyRegions.find(
+                          (r: any) => r.name === pt.name && (r.view || 'back') === currentView,
+                        )
+                        const w = region ? region.w : 10
+                        const h = region ? region.h : 10
+                        const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
+
+                        const PointElement = (
                           <div
-                            key={region.id}
-                            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] cursor-pointer transition-all duration-500 hover:bg-cyan-400/30 hover:shadow-[0_0_15px_5px_rgba(34,211,238,0.4)] z-10 border border-transparent hover:border-cyan-400/50"
+                            key={pt.id}
+                            onPointerDown={(e) => {
+                              if (!isAdjusting) return
+                              e.preventDefault()
+                              e.stopPropagation()
+                              e.currentTarget.setPointerCapture(e.pointerId)
+                              setDraggingPointId(pt.id)
+                            }}
+                            onPointerMove={(e) => {
+                              if (
+                                !isAdjusting ||
+                                draggingPointId !== pt.id ||
+                                !containerRef.current
+                              )
+                                return
+                              const rect = containerRef.current.getBoundingClientRect()
+                              let x = ((e.clientX - rect.left) / rect.width) * 100
+                              let y = ((e.clientY - rect.top) / rect.height) * 100
+                              x = Number(Math.max(0, Math.min(100, x)).toFixed(1))
+                              y = Number(Math.max(0, Math.min(100, y)).toFixed(1))
+                              setDraftPoints((prev) =>
+                                prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
+                              )
+                            }}
+                            onPointerUp={(e) => {
+                              if (!isAdjusting || draggingPointId !== pt.id) return
+                              e.currentTarget.releasePointerCapture(e.pointerId)
+                              setDraggingPointId(null)
+                            }}
+                            className={cn(
+                              'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
+                              isAdjusting ? 'cursor-move z-30' : 'cursor-pointer z-20',
+                              isAdjusting
+                                ? draggingPointId === pt.id
+                                  ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
+                                  : 'bg-yellow-400/40 shadow-[0_0_10px_5px_rgba(250,204,21,0.4)] border-2 border-yellow-400/80'
+                                : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
+                              isAdjusting &&
+                                draggingPointId &&
+                                draggingPointId !== pt.id &&
+                                'opacity-50',
+                            )}
                             style={{
-                              left: `${region.x}%`,
-                              top: `${region.y}%`,
-                              width: `${region.w}%`,
-                              height: `${region.h}%`,
+                              left: `${pt.x}%`,
+                              top: `${pt.y}%`,
+                              width: `${w}%`,
+                              height: `${h}%`,
+                              touchAction: isAdjusting ? 'none' : 'auto',
                             }}
                             onClick={(e) => {
+                              if (isAdjusting) return
                               e.stopPropagation()
-                              handleRegionClick(region, null)
+                              handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
                             }}
-                          />
-                        )
-                      })}
-
-                    {(isAdjusting ? draftPoints : data.points).map((pt: any) => {
-                      const region = data.anatomyRegions.find((r: any) => r.name === pt.name)
-                      const w = region ? region.w : 10
-                      const h = region ? region.h : 10
-                      const globalIndex = data.points.findIndex((p: any) => p.id === pt.id)
-
-                      const PointElement = (
-                        <div
-                          key={pt.id}
-                          onPointerDown={(e) => {
-                            if (!isAdjusting) return
-                            e.preventDefault()
-                            e.stopPropagation()
-                            e.currentTarget.setPointerCapture(e.pointerId)
-                            setDraggingPointId(pt.id)
-                          }}
-                          onPointerMove={(e) => {
-                            if (!isAdjusting || draggingPointId !== pt.id || !containerRef.current)
-                              return
-                            const rect = containerRef.current.getBoundingClientRect()
-                            let x = ((e.clientX - rect.left) / rect.width) * 100
-                            let y = ((e.clientY - rect.top) / rect.height) * 100
-                            x = Number(Math.max(0, Math.min(100, x)).toFixed(1))
-                            y = Number(Math.max(0, Math.min(100, y)).toFixed(1))
-                            setDraftPoints((prev) =>
-                              prev.map((p) => (p.id === pt.id ? { ...p, x, y } : p)),
-                            )
-                          }}
-                          onPointerUp={(e) => {
-                            if (!isAdjusting || draggingPointId !== pt.id) return
-                            e.currentTarget.releasePointerCapture(e.pointerId)
-                            setDraggingPointId(null)
-                          }}
-                          className={cn(
-                            'absolute -translate-x-1/2 -translate-y-1/2 rounded-[40%] transition-all duration-75',
-                            isAdjusting ? 'cursor-move z-30' : 'cursor-pointer z-20',
-                            isAdjusting
-                              ? draggingPointId === pt.id
-                                ? 'bg-yellow-400/80 shadow-[0_0_20px_10px_rgba(250,204,21,0.8)] border-2 border-yellow-400 scale-110'
-                                : 'bg-yellow-400/40 shadow-[0_0_10px_5px_rgba(250,204,21,0.4)] border-2 border-yellow-400/80'
-                              : 'bg-red-600/60 shadow-[0_0_20px_10px_rgba(220,38,38,0.6)] border-2 border-red-500 animate-pulse backdrop-blur-[1px]',
-                            isAdjusting &&
-                              draggingPointId &&
-                              draggingPointId !== pt.id &&
-                              'opacity-50',
-                          )}
-                          style={{
-                            left: `${pt.x}%`,
-                            top: `${pt.y}%`,
-                            width: `${w}%`,
-                            height: `${h}%`,
-                            touchAction: isAdjusting ? 'none' : 'auto',
-                          }}
-                          onClick={(e) => {
-                            if (isAdjusting) return
-                            e.stopPropagation()
-                            handleRegionClick(region || { name: pt.name, x: pt.x, y: pt.y }, pt)
-                          }}
-                        >
-                          {isAdjusting && draggingPointId === pt.id && (
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
-                              {pt.x.toFixed(1)}%, {pt.y.toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                      )
-
-                      if (isAdjusting) return PointElement
-
-                      return (
-                        <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
-                          <HoverCardTrigger asChild>{PointElement}</HoverCardTrigger>
-                          <HoverCardContent
-                            className="w-72 z-50 glass-panel border-border/50 p-4"
-                            align="center"
-                            side="right"
-                            sideOffset={15}
                           >
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-start">
-                                <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
-                                  <div
+                            {isAdjusting && draggingPointId === pt.id && (
+                              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
+                                {pt.x.toFixed(1)}%, {pt.y.toFixed(1)}%
+                              </div>
+                            )}
+                          </div>
+                        )
+
+                        if (isAdjusting) return PointElement
+
+                        return (
+                          <HoverCard key={pt.id} openDelay={200} closeDelay={100}>
+                            <HoverCardTrigger asChild>{PointElement}</HoverCardTrigger>
+                            <HoverCardContent
+                              className="w-72 z-50 glass-panel border-border/50 p-4"
+                              align="center"
+                              side="right"
+                              sideOffset={15}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-start">
+                                  <h4 className="font-bold flex items-center gap-2 text-sm text-foreground">
+                                    <div
+                                      className={cn(
+                                        'w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0',
+                                        getIntensityColor(pt.intensity || 5),
+                                      )}
+                                    >
+                                      {globalIndex + 1}
+                                    </div>
+                                    {pt.name}
+                                  </h4>
+                                  <Badge
                                     className={cn(
-                                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0',
+                                      'shadow-sm',
                                       getIntensityColor(pt.intensity || 5),
                                     )}
                                   >
-                                    {globalIndex + 1}
-                                  </div>
-                                  {pt.name}
-                                </h4>
-                                <Badge
-                                  className={cn('shadow-sm', getIntensityColor(pt.intensity || 5))}
-                                >
-                                  Nível {pt.intensity || 5}
-                                </Badge>
-                              </div>
-
-                              {pt.pathologies?.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {pt.pathologies.map((p: string) => (
-                                    <Badge
-                                      key={p}
-                                      variant="secondary"
-                                      className="text-[10px] px-1.5 py-0 h-5 font-medium bg-muted/80"
-                                    >
-                                      {p}
-                                    </Badge>
-                                  ))}
+                                    Nível {pt.intensity || 5}
+                                  </Badge>
                                 </div>
-                              )}
 
-                              {pt.notes ? (
-                                <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50 line-clamp-3 leading-relaxed">
-                                  {pt.notes}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-muted-foreground italic opacity-70">
-                                  Sem observações clínicas.
-                                </p>
-                              )}
+                                {pt.pathologies?.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {pt.pathologies.map((p: string) => (
+                                      <Badge
+                                        key={p}
+                                        variant="secondary"
+                                        className="text-[10px] px-1.5 py-0 h-5 font-medium bg-muted/80"
+                                      >
+                                        {p}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
 
-                              <div className="pt-2 border-t flex gap-2 justify-end">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    remove(pt.id)
-                                  }}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setForm({ ...pt, pathologies: pt.pathologies || [] })
-                                    setIsOpen(true)
-                                  }}
-                                >
-                                  Editar Detalhes
-                                </Button>
+                                {pt.notes ? (
+                                  <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50 line-clamp-3 leading-relaxed">
+                                    {pt.notes}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground italic opacity-70">
+                                    Sem observações clínicas.
+                                  </p>
+                                )}
+
+                                <div className="pt-2 border-t flex gap-2 justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      remove(pt.id)
+                                    }}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setForm({ ...pt, pathologies: pt.pathologies || [] })
+                                      setIsOpen(true)
+                                    }}
+                                  >
+                                    Editar Detalhes
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      )
-                    })}
+                            </HoverCardContent>
+                          </HoverCard>
+                        )
+                      })}
                   </div>
                 </CardContent>
               </Card>
@@ -906,8 +978,14 @@ export default function PatientRecord() {
                               >
                                 {index + 1}
                               </div>
-                              <span className="truncate text-sm">
+                              <span className="truncate text-sm flex items-center gap-2">
                                 {pt.name || 'Ponto não nomeado'}
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] h-4 px-1 py-0 font-normal"
+                                >
+                                  {(pt.view || 'back') === 'front' ? 'Frente' : 'Costas'}
+                                </Badge>
                               </span>
                             </div>
 
@@ -1311,7 +1389,7 @@ export default function PatientRecord() {
                   value={[form.intensity]}
                   onValueChange={(v) => setForm({ ...form, intensity: v[0] })}
                   max={10}
-                  min={1}
+                  min={0}
                   step={1}
                   className="py-2"
                 />
@@ -1623,8 +1701,11 @@ export default function PatientRecord() {
                 <tbody>
                   {data.points.map((pt: any) => (
                     <tr key={pt.id} className="border-b border-gray-200">
-                      <td className="p-2 font-medium">{pt.name || pt.view}</td>
-                      <td className="p-2 text-center">{pt.intensity}/10</td>
+                      <td className="p-2 font-medium">
+                        {pt.name || 'Ponto'} (
+                        {(pt.view || 'back') === 'front' ? 'Frente' : 'Costas'})
+                      </td>
+                      <td className="p-2 text-center">{pt.intensity ?? 5}/10</td>
                       <td className="p-2">{pt.pathologies?.join(', ') || '-'}</td>
                       <td className="p-2 italic text-gray-700">{pt.notes || '-'}</td>
                     </tr>
