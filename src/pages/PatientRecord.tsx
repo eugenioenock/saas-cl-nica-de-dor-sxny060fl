@@ -107,10 +107,12 @@ export default function PatientRecord() {
     usages: [],
     actionLogs: [],
     anatomyRegions: DEFAULT_ANATOMY_REGIONS,
+    appointments: [],
   })
   const [clinicSettings, setClinicSettings] = useState<any>(null)
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [form, setForm] = useState<any>({
     x: 0,
@@ -289,6 +291,8 @@ export default function PatientRecord() {
   const load = async () => {
     if (!id) return
     try {
+      setLoading(true)
+      setError(null)
       const [
         patient,
         points,
@@ -300,6 +304,8 @@ export default function PatientRecord() {
         inventoryRes,
         batchesRes,
         actionLogsRes,
+        templatesRes,
+        appointmentsRes,
       ] = await Promise.all([
         pb.collection('patients').getOne(id!, { expand: 'locked_by' }),
         pb
@@ -307,22 +313,32 @@ export default function PatientRecord() {
           .getFullList({ filter: `patient_id="${id}"`, sort: '-created' }),
         pb
           .collection('medical_notes')
-          .getFullList({ filter: `patient_id="${id}"`, sort: '-created' }),
+          .getFullList({ filter: `patient_id="${id}"`, sort: '-date,-created' }),
         pb.collection('pathologies_catalog').getFullList({ sort: 'name' }),
         pb
           .collection('clinic_settings')
           .getList(1, 1)
           .catch(() => null),
-        pb.collection('users').getFullList(),
-        pb.collection('inventory_usage').getFullList({
-          filter: `patient_id="${id}"`,
-          expand: 'batch_id,batch_id.material_id,professional_id',
-          sort: '-usage_date',
-        }),
-        pb.collection('clinical_inventory').getFullList({ sort: 'name' }),
+        pb
+          .collection('users')
+          .getFullList()
+          .catch(() => []),
+        pb
+          .collection('inventory_usage')
+          .getFullList({
+            filter: `patient_id="${id}"`,
+            expand: 'batch_id,batch_id.material_id,professional_id',
+            sort: '-usage_date',
+          })
+          .catch(() => []),
+        pb
+          .collection('clinical_inventory')
+          .getFullList({ sort: 'name' })
+          .catch(() => []),
         pb
           .collection('inventory_batches')
-          .getFullList({ filter: 'current_quantity > 0', sort: 'expiry_date' }),
+          .getFullList({ filter: 'current_quantity > 0', sort: 'expiry_date' })
+          .catch(() => []),
         pb
           .collection('action_logs')
           .getFullList({
@@ -335,6 +351,14 @@ export default function PatientRecord() {
           .collection('clinic_templates')
           .getFullList({ filter: 'type="anatomical_model"' })
           .catch(() => []),
+        pb
+          .collection('appointments')
+          .getFullList({
+            filter: `patient_id="${id}"`,
+            sort: '-start_time',
+            expand: 'professional_id',
+          })
+          .catch(() => []),
       ])
 
       let anatomyRegions = DEFAULT_ANATOMY_REGIONS
@@ -346,10 +370,11 @@ export default function PatientRecord() {
         patient,
         points,
         notes,
-        catalog: catalog.map((c) => c.name),
+        catalog: catalog.map((c: string) => c.name),
         usages: usagesRes,
         actionLogs: actionLogsRes,
         anatomyRegions,
+        appointments: appointmentsRes || [],
       })
       setUsers(usersRes)
       setInventoryItems(inventoryRes)
@@ -357,8 +382,13 @@ export default function PatientRecord() {
       if (settingsRes && settingsRes.items.length > 0) {
         setClinicSettings(settingsRes.items[0])
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
+      setError(
+        e?.status === 404 || e?.status === 403
+          ? 'Paciente não encontrado ou você não tem permissão para acessá-lo.'
+          : 'Erro ao carregar os dados do paciente. Tente novamente mais tarde.',
+      )
     } finally {
       setLoading(false)
     }
@@ -471,9 +501,27 @@ export default function PatientRecord() {
   if (loading)
     return (
       <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="animate-spin" />
+        <Loader2 className="animate-spin w-8 h-8 text-primary" />
       </div>
     )
+
+  if (error) {
+    return (
+      <div className="flex flex-col h-[50vh] items-center justify-center space-y-4">
+        <div className="bg-destructive/10 p-4 rounded-full">
+          <Activity className="h-8 w-8 text-destructive" />
+        </div>
+        <h2 className="text-xl font-bold">Acesso Negado ou Não Encontrado</h2>
+        <p className="text-muted-foreground max-w-md text-center">{error}</p>
+        <Button asChild className="mt-4">
+          <Link to="/pacientes">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Pacientes
+          </Link>
+        </Button>
+      </div>
+    )
+  }
+
   if (!data.patient) return <div>Não encontrado.</div>
 
   const visiblePoints = data.points
@@ -528,7 +576,8 @@ export default function PatientRecord() {
         <Tabs defaultValue="map">
           <TabsList className="w-full sm:w-auto overflow-x-auto justify-start">
             <TabsTrigger value="map">Mapa de Dor</TabsTrigger>
-            <TabsTrigger value="notes">Histórico Clínico</TabsTrigger>
+            <TabsTrigger value="notes">Prontuário</TabsTrigger>
+            <TabsTrigger value="appointments">Agendamentos</TabsTrigger>
             <TabsTrigger value="evolution">Evolução</TabsTrigger>
             <TabsTrigger value="inventory">Materiais Utilizados</TabsTrigger>
           </TabsList>
@@ -949,58 +998,165 @@ export default function PatientRecord() {
           <TabsContent value="notes" className="mt-4">
             <Card>
               <CardHeader className="flex flex-row justify-between items-center">
-                <CardTitle>Registros Clínicos</CardTitle>
+                <CardTitle>Prontuário Médico</CardTitle>
                 <div className="flex flex-wrap gap-2 justify-end">
                   <ProtocolModal patientId={id!} onSuccess={load} />
                   <ProcedureModal patientId={id!} onAdd={load} />
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {data.notes.map((n: any) => (
-                  <div
-                    key={n.id}
-                    className={cn(
-                      'p-4 border rounded-lg relative',
-                      n.is_signed ? 'bg-slate-50 dark:bg-slate-900' : '',
-                    )}
-                  >
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-                      <div className="font-semibold text-primary">
-                        {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'} •{' '}
-                        {new Date(n.created).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handlePrintNote(n)}>
-                          <Printer className="w-4 h-4 mr-2" /> PDF
-                        </Button>
-                        {n.is_signed ? (
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
+                {data.notes.length > 0 ? (
+                  <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-6 py-4">
+                    {data.notes.map((n: any) => {
+                      const prof = users.find((u) => u.id === n.professionalId)
+                      return (
+                        <div key={n.id} className="relative">
+                          <div className="absolute -left-[33px] bg-background border-2 border-primary w-4 h-4 rounded-full mt-1.5" />
+                          <div
+                            className={cn(
+                              'p-4 border rounded-lg shadow-sm transition-colors',
+                              n.is_signed ? 'bg-slate-50 dark:bg-slate-900/50' : 'bg-card',
+                            )}
                           >
-                            <Check className="w-3 h-3" /> Assinado
-                          </Badge>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => setNoteToSign(n.id)}>
-                            Assinar Prontuário
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90">
-                      {n.content}
-                    </p>
-                    {n.is_signed && n.signature_hash && (
-                      <p className="mt-4 text-xs text-muted-foreground font-mono">
-                        Assinado em: {new Date(n.signed_at).toLocaleString()} • Hash:{' '}
-                        {n.signature_hash}
-                      </p>
-                    )}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 border-b pb-3">
+                              <div>
+                                <div className="font-semibold text-primary flex items-center gap-2">
+                                  {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
+                                  <span className="text-xs font-normal text-muted-foreground">
+                                    {new Date(n.date || n.created).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-0.5">
+                                  Profissional:{' '}
+                                  <span className="font-medium text-foreground">
+                                    {prof?.name ||
+                                      prof?.email ||
+                                      n.professionalId ||
+                                      'Não identificado'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handlePrintNote(n)}
+                                >
+                                  <Printer className="w-4 h-4 mr-2" /> PDF
+                                </Button>
+                                {n.is_signed ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 flex items-center gap-1"
+                                  >
+                                    <Check className="w-3 h-3" /> Assinado
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setNoteToSign(n.id)}
+                                  >
+                                    Assinar
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="mt-2 text-sm whitespace-pre-wrap text-foreground/90 leading-relaxed">
+                              {n.content}
+                            </p>
+                            {n.is_signed && n.signature_hash && (
+                              <div className="mt-4 pt-3 border-t border-border/50">
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  <span className="font-semibold">Assinado em:</span>{' '}
+                                  {new Date(n.signed_at).toLocaleString()}{' '}
+                                  <br className="sm:hidden" />
+                                  <span className="hidden sm:inline">•</span>{' '}
+                                  <span className="font-semibold">Hash:</span> {n.signature_hash}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-                {data.notes.length === 0 && (
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
+                    <div className="bg-muted/30 p-4 rounded-full mb-4">
+                      <Activity className="h-8 w-8 text-primary/40" />
+                    </div>
+                    <p className="text-base font-medium">
+                      Nenhum prontuário registrado para este paciente.
+                    </p>
+                    <p className="text-sm opacity-80 mt-1">
+                      Adicione uma nota ou procedimento para começar.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="appointments" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Histórico de Agendamentos</CardTitle>
+                <CardDescription>Consultas e retornos para este paciente</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {data.appointments && data.appointments.length > 0 ? (
+                  <div className="space-y-4">
+                    {data.appointments.map((apt: any) => (
+                      <div
+                        key={apt.id}
+                        className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 p-4 border rounded-lg bg-card"
+                      >
+                        <div>
+                          <p className="font-semibold text-primary">{apt.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(apt.start_time).toLocaleString('pt-BR', {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Profissional:{' '}
+                            <span className="font-medium text-foreground">
+                              {apt.expand?.professional_id?.name || 'Não identificado'}
+                            </span>
+                          </p>
+                          {apt.notes && (
+                            <p className="text-sm mt-2 italic border-l-2 border-primary/20 pl-2">
+                              "{apt.notes}"
+                            </p>
+                          )}
+                        </div>
+                        <Badge
+                          variant={
+                            apt.status === 'completed'
+                              ? 'default'
+                              : apt.status === 'cancelled'
+                                ? 'destructive'
+                                : apt.status === 'confirmed'
+                                  ? 'secondary'
+                                  : 'outline'
+                          }
+                        >
+                          {apt.status === 'completed'
+                            ? 'Concluído'
+                            : apt.status === 'cancelled'
+                              ? 'Cancelado'
+                              : apt.status === 'confirmed'
+                                ? 'Confirmado'
+                                : 'Agendado'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    Nenhum registro clínico encontrado.
+                    Nenhum agendamento encontrado para este paciente.
                   </div>
                 )}
               </CardContent>
@@ -1462,31 +1618,38 @@ export default function PatientRecord() {
 
             <div className="mb-8">
               <h2 className="text-lg font-bold mb-2 uppercase bg-gray-100 p-2 rounded">
-                Evolução Clínica e Notas
+                Evolução Clínica e Prontuário
               </h2>
               <div className="space-y-4 mt-2 p-2">
-                {data.notes.map((n: any) => (
-                  <div
-                    key={n.id}
-                    className="pb-3 border-b border-dashed border-gray-300 last:border-0"
-                  >
-                    <div className="font-bold flex justify-between items-center">
-                      <span>
-                        {new Date(n.created).toLocaleDateString()} -{' '}
-                        {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
-                      </span>
-                      {n.is_signed && (
-                        <span className="text-xs font-normal text-gray-500">
-                          Assinado: {new Date(n.signed_at).toLocaleDateString()}
+                {data.notes.map((n: any) => {
+                  const prof = users.find((u) => u.id === n.professionalId)
+                  return (
+                    <div
+                      key={n.id}
+                      className="pb-3 border-b border-dashed border-gray-300 last:border-0"
+                    >
+                      <div className="font-bold flex flex-col justify-between items-start sm:flex-row sm:items-center">
+                        <span>
+                          {new Date(n.date || n.created).toLocaleDateString()} -{' '}
+                          {n.status === 'completed' ? 'Procedimento' : 'Nota Clínica'}
                         </span>
-                      )}
+                        {n.is_signed && (
+                          <span className="text-xs font-normal text-gray-500">
+                            Assinado: {new Date(n.signed_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-600 mb-1">
+                        Profissional:{' '}
+                        {prof?.name || prof?.email || n.professionalId || 'Não identificado'}
+                      </div>
+                      <p className="mt-1 text-gray-800 whitespace-pre-wrap">{n.content}</p>
                     </div>
-                    <p className="mt-1 text-gray-800 whitespace-pre-wrap">{n.content}</p>
-                  </div>
-                ))}
+                  )
+                })}
                 {data.notes.length === 0 && (
                   <div className="text-gray-500 text-center py-4">
-                    Nenhum registro clínico encontrado.
+                    Nenhum prontuário registrado para este paciente.
                   </div>
                 )}
               </div>
