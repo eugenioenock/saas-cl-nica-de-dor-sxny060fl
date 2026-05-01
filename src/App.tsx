@@ -62,6 +62,10 @@ const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactN
 
   if (!user) return <Navigate to="/login" replace />
 
+  if (user.status !== 'active') {
+    return <Navigate to="/pending-approval" replace />
+  }
+
   if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
     return <Navigate to="/pending-role" replace />
   }
@@ -76,6 +80,10 @@ const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactN
 const RouteDispatcher = () => {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
+
+  if (user.status !== 'active') {
+    return <Navigate to="/pending-approval" replace />
+  }
 
   if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
     return <Navigate to="/pending-role" replace />

@@ -8,6 +8,9 @@ export default function PendingRole() {
   const { user, signOut } = useAuth()
 
   if (!user) return <Navigate to="/login" replace />
+  if (user.status === 'pending' || user.status === 'rejected') {
+    return <Navigate to="/pending-approval" replace />
+  }
   if (user.role && (user.role === 'admin' || user.clinic_id)) {
     return <Navigate to="/" replace />
   }
