@@ -9,7 +9,7 @@ import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
 
 export default function PendingRole() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, refreshUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [clinicPhone, setClinicPhone] = useState<string>('')
@@ -40,11 +40,15 @@ export default function PendingRole() {
 
   useRealtime('users', async (e) => {
     if (e.record.id === user?.id) {
-      if (e.record.role && (e.record.role === 'admin' || e.record.clinic_id)) {
+      if (
+        e.record.role &&
+        (e.record.role === 'admin' || e.record.clinic_id) &&
+        e.record.status === 'active'
+      ) {
         try {
-          await pb.collection('users').authRefresh()
+          await refreshUser()
           toast.success('Role updated! Redirecting...')
-          navigate('/')
+          navigate(location.state?.from?.pathname || '/')
         } catch (error) {
           console.error('Error refreshing auth:', error)
         }
@@ -55,13 +59,18 @@ export default function PendingRole() {
   const checkStatus = async () => {
     setIsRefreshing(true)
     try {
-      const res = await pb.collection('users').authRefresh()
-      const updatedUser = res.record
-      if (updatedUser?.role && (updatedUser.role === 'admin' || updatedUser.clinic_id)) {
+      await refreshUser()
+
+      const updatedUser = pb.authStore.record
+      if (
+        updatedUser?.role &&
+        (updatedUser.role === 'admin' || updatedUser.clinic_id) &&
+        updatedUser.status === 'active'
+      ) {
         toast.success('Role updated! Redirecting...')
-        navigate('/')
+        navigate(location.state?.from?.pathname || '/')
       } else {
-        toast.info('Still pending role assignment.')
+        toast.info('Still pending role assignment. Please wait for an administrator.')
       }
     } catch (error) {
       toast.error('Failed to check status.')
@@ -72,10 +81,10 @@ export default function PendingRole() {
 
   if (!user) return <Navigate to="/login" replace />
   if (user.status === 'pending' || user.status === 'rejected') {
-    return <Navigate to="/pending-approval" replace />
+    return <Navigate to="/pending-approval" replace state={location.state} />
   }
-  if (user.role && (user.role === 'admin' || user.clinic_id)) {
-    return <Navigate to="/" replace />
+  if (user.role && (user.role === 'admin' || user.clinic_id) && user.status === 'active') {
+    return <Navigate to={location.state?.from?.pathname || '/'} replace />
   }
 
   return (
