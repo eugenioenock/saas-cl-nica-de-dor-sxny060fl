@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -60,15 +60,16 @@ const getDashUrl = (role?: string) => {
 
 const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactNode }) => {
   const { user } = useAuth()
+  const location = useLocation()
 
   if (!user) return <Navigate to="/login" replace />
 
   if (user.status !== 'active') {
-    return <Navigate to="/pending-approval" replace />
+    return <Navigate to="/pending-approval" replace state={{ from: location }} />
   }
 
   if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
-    return <Navigate to="/pending-role" replace />
+    return <Navigate to="/pending-role" replace state={{ from: location }} />
   }
 
   if (!roles.includes(user.role)) {
@@ -80,14 +81,15 @@ const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactN
 
 const RouteDispatcher = () => {
   const { user } = useAuth()
+  const location = useLocation()
   if (!user) return <Navigate to="/login" replace />
 
   if (user.status !== 'active') {
-    return <Navigate to="/pending-approval" replace />
+    return <Navigate to="/pending-approval" replace state={{ from: location }} />
   }
 
   if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
-    return <Navigate to="/pending-role" replace />
+    return <Navigate to="/pending-role" replace state={{ from: location }} />
   }
 
   return <Navigate to={getDashUrl(user.role)} replace />
