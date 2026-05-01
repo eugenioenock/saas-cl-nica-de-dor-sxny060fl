@@ -27,7 +27,7 @@ export default function PublicLayout() {
           : role === 'professional'
             ? '/professional/dashboard'
             : role === 'receptionist'
-              ? '/reception/dashboard'
+              ? '/agenda'
               : '/portal'
 
     return <Navigate to={dashUrl} replace />

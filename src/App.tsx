@@ -11,7 +11,6 @@ import Inventory from './pages/Inventory'
 import Financeiro from './pages/Financeiro'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
-import NotFound from './pages/NotFound'
 import RecordsRedirect from './pages/RecordsRedirect'
 import Agenda from './pages/Agenda'
 import Login from './pages/Login'
@@ -51,7 +50,7 @@ const getDashUrl = (role?: string) => {
   if (role === 'admin') return '/admin/dashboard'
   if (role === 'manager') return '/manager/dashboard'
   if (role === 'professional') return '/professional/dashboard'
-  if (role === 'receptionist') return '/reception/dashboard'
+  if (role === 'receptionist') return '/agenda'
   return '/portal'
 }
 
@@ -66,7 +65,8 @@ const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactN
 
 const RouteDispatcher = () => {
   const { user } = useAuth()
-  return <Navigate to={getDashUrl(user?.role)} replace />
+  if (!user) return <Navigate to="/login" replace />
+  return <Navigate to={getDashUrl(user.role)} replace />
 }
 
 const App = () => (
@@ -108,14 +108,6 @@ const App = () => (
                   path="/professional/dashboard"
                   element={
                     <RoleGate roles={['professional']}>
-                      <Index />
-                    </RoleGate>
-                  }
-                />
-                <Route
-                  path="/reception/dashboard"
-                  element={
-                    <RoleGate roles={['receptionist']}>
                       <Index />
                     </RoleGate>
                   }
@@ -400,7 +392,7 @@ const App = () => (
               </Route>
 
               <Route path="/pending-approval" element={<PendingApproval />} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<RouteDispatcher />} />
             </Routes>
           </TooltipProvider>
         </AppProvider>

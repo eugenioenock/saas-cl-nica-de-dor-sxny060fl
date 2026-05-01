@@ -94,7 +94,7 @@ export function AppSidebar() {
     if (user?.role === 'admin') return '/admin/dashboard'
     if (user?.role === 'manager') return '/manager/dashboard'
     if (user?.role === 'professional') return '/professional/dashboard'
-    if (user?.role === 'receptionist') return '/reception/dashboard'
+    if (user?.role === 'receptionist') return '/agenda'
     return '/portal'
   }
 
