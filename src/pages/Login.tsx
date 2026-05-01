@@ -64,11 +64,11 @@ export default function Login() {
       <div className="hidden md:flex flex-1 flex-col justify-between bg-primary p-10 text-white relative overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
-            src="https://img.usecurling.com/p/800/1200?q=modern%20clinic&color=blue"
+            src="https://img.usecurling.com/p/800/1200?q=modern%20clinic&color=green"
             alt="Clinic Background"
-            className="w-full h-full object-cover opacity-20"
+            className="w-full h-full object-cover opacity-20 grayscale"
           />
-          <div className="absolute inset-0 bg-primary/80 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-primary/90 mix-blend-multiply" />
         </div>
         <div className="relative z-10 flex items-center gap-2 text-2xl font-bold">
           {settings?.logo ? (

@@ -3,7 +3,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppProvider } from '@/hooks/use-app-context'
-import Layout from './components/Layout'
+import PrivateLayout from './components/PrivateLayout'
 import Index from './pages/Index'
 import Patients from './pages/Patients'
 import PatientRecord from './pages/PatientRecord'
@@ -49,7 +49,7 @@ import PublicLayout from './components/PublicLayout'
 const getDashUrl = (role?: string) => {
   if (role === 'admin') return '/admin/dashboard'
   if (role === 'manager') return '/manager/dashboard'
-  if (role === 'professional') return '/professional/dashboard'
+  if (role === 'professional') return '/agenda'
   if (role === 'receptionist') return '/agenda'
   return '/portal'
 }
@@ -84,7 +84,7 @@ const App = () => (
                 <Route path="/reset-password" element={<ResetPassword />} />
               </Route>
 
-              <Route element={<Layout />}>
+              <Route element={<PrivateLayout />}>
                 <Route path="/" element={<RouteDispatcher />} />
 
                 {/* Dashboards */}

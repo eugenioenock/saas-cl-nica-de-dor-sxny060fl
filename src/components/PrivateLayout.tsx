@@ -5,7 +5,7 @@ import { AppHeader } from './layout/app-header'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2 } from 'lucide-react'
 
-export default function Layout() {
+export default function PrivateLayout() {
   const { user, loading } = useAuth()
 
   if (loading) {

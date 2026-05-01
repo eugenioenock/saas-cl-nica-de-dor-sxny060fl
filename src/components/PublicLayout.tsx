@@ -25,7 +25,7 @@ export default function PublicLayout() {
         : role === 'manager'
           ? '/manager/dashboard'
           : role === 'professional'
-            ? '/professional/dashboard'
+            ? '/agenda'
             : role === 'receptionist'
               ? '/agenda'
               : '/portal'
