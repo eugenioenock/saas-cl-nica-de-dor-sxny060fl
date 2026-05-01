@@ -32,114 +32,217 @@ import {
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/hooks/use-auth'
 
-const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/patient-portal' }]
-
-const settingsItems: {
+type NavItem = {
   title: string
   icon: any
   url: string
-  adminOnly?: boolean
-  managerAllowed?: boolean
-}[] = [
-  {
-    title: 'Gestão de Usuários',
-    icon: Users,
-    url: '/admin/users',
-    adminOnly: true,
-    managerAllowed: true,
-  },
-  {
-    title: 'Logs de Acesso',
-    icon: ShieldPlus,
-    url: '/admin/logs',
-    adminOnly: true,
-    managerAllowed: true,
-  },
-  { title: 'Configurações Gerais', icon: Settings, url: '/settings' },
-  { title: 'Franquia - Unidades', icon: Building2, url: '/admin/franchise', adminOnly: true },
-  { title: 'Franquia - Dashboard', icon: BarChart3, url: '/franchise-dashboard', adminOnly: true },
-  {
-    title: 'Franquia - Templates',
-    icon: FileText,
-    url: '/admin/franchise/templates',
-    adminOnly: true,
-  },
-  {
-    title: 'Franquia - Transf.',
-    icon: ArrowRightLeft,
-    url: '/admin/franchise/transfers',
-    adminOnly: true,
-  },
-  {
-    title: 'Auditoria de Sistema',
-    icon: Activity,
-    url: '/settings/audit-history',
-    adminOnly: true,
-  },
-  {
-    title: 'Auditoria de Assin.',
-    icon: PenLine,
-    url: '/settings/signature-audit',
-    adminOnly: true,
-  },
-  { title: 'Modelo Anatômico', icon: Activity, url: '/admin/anatomical-model', adminOnly: false },
-]
+  roles: string[]
+}
+
+type NavGroup = {
+  label: string
+  items: NavItem[]
+}
 
 export function AppSidebar() {
   const location = useLocation()
   const { user } = useAuth()
-  const isPatient = user?.role === 'patient'
+  const role = user?.role || 'pending'
 
   const getDashUrl = () => {
-    if (user?.role === 'admin') return '/admin/dashboard'
-    if (user?.role === 'manager') return '/manager/dashboard'
-    if (user?.role === 'professional') return '/professional/dashboard'
-    if (user?.role === 'receptionist') return '/reception/dashboard'
-    if (user?.role === 'patient') return '/patient-portal'
+    if (role === 'admin') return '/admin/dashboard'
+    if (role === 'manager') return '/manager/dashboard'
+    if (role === 'professional') return '/professional/dashboard'
+    if (role === 'receptionist') return '/reception/dashboard'
+    if (role === 'patient') return '/patient-portal'
     return '/pending-role'
   }
 
   const dashUrl = getDashUrl()
 
-  const adminNavItems = [
-    { title: 'Dashboard', icon: LayoutDashboard, url: dashUrl },
-    { title: 'Agenda', icon: CalendarDays, url: '/agenda' },
-    { title: 'Pacientes', icon: Users, url: '/pacientes' },
-    { title: 'Prontuários', icon: Activity, url: '/records' },
-    { title: 'Estoque', icon: Package, url: '/inventory' },
-    { title: 'Ordens de Compra', icon: ShoppingCart, url: '/inventory/orders' },
-    { title: 'Fornecedores', icon: Building2, url: '/inventory/suppliers' },
-    { title: 'Uso Rápido', icon: Zap, url: '/inventory/usage/quick' },
-    { title: 'Financeiro', icon: DollarSign, url: '/financeiro' },
-    { title: 'Meu Financeiro', icon: DollarSign, url: '/professional/finance' },
-    { title: 'Convênios', icon: ShieldPlus, url: '/insurance' },
-    { title: 'Relatórios', icon: BarChart3, url: '/reports' },
-    { title: 'Comparativo', icon: Building2, url: '/dashboard/units-comparison' },
-    { title: 'Manual', icon: BookOpen, url: '/manual' },
+  const allGroups: NavGroup[] = [
+    {
+      label: 'Principal',
+      items: [
+        { title: 'Meu Portal', icon: LayoutDashboard, url: '/patient-portal', roles: ['patient'] },
+        {
+          title: 'Dashboard',
+          icon: LayoutDashboard,
+          url: dashUrl,
+          roles: ['admin', 'manager', 'professional', 'receptionist'],
+        },
+        {
+          title: 'Agenda',
+          icon: CalendarDays,
+          url: '/agenda',
+          roles: ['admin', 'manager', 'professional', 'receptionist'],
+        },
+        {
+          title: 'Pacientes',
+          icon: Users,
+          url: '/pacientes',
+          roles: ['admin', 'manager', 'professional', 'receptionist'],
+        },
+        {
+          title: 'Prontuários',
+          icon: Activity,
+          url: '/records',
+          roles: ['admin', 'manager', 'professional'],
+        },
+      ],
+    },
+    {
+      label: 'Estoque',
+      items: [
+        {
+          title: 'Uso Rápido',
+          icon: Zap,
+          url: '/inventory/usage/quick',
+          roles: ['admin', 'manager', 'professional'],
+        },
+        {
+          title: 'Gestão de Estoque',
+          icon: Package,
+          url: '/inventory',
+          roles: ['admin', 'manager'],
+        },
+        {
+          title: 'Ordens de Compra',
+          icon: ShoppingCart,
+          url: '/inventory/orders',
+          roles: ['admin', 'manager'],
+        },
+        {
+          title: 'Fornecedores',
+          icon: Building2,
+          url: '/inventory/suppliers',
+          roles: ['admin', 'manager'],
+        },
+      ],
+    },
+    {
+      label: 'Financeiro',
+      items: [
+        { title: 'Visão Geral', icon: DollarSign, url: '/financeiro', roles: ['admin', 'manager'] },
+        {
+          title: 'Meu Financeiro',
+          icon: DollarSign,
+          url: '/professional/finance',
+          roles: ['professional'],
+        },
+        { title: 'Convênios', icon: ShieldPlus, url: '/insurance', roles: ['admin', 'manager'] },
+      ],
+    },
+    {
+      label: 'Análise',
+      items: [
+        {
+          title: 'Relatórios',
+          icon: BarChart3,
+          url: '/reports',
+          roles: ['admin', 'manager', 'professional'],
+        },
+        {
+          title: 'Comparativo',
+          icon: Building2,
+          url: '/dashboard/units-comparison',
+          roles: ['admin'],
+        },
+      ],
+    },
+    {
+      label: 'Sistema',
+      items: [
+        {
+          title: 'Manual do Usuário',
+          icon: BookOpen,
+          url: '/manual',
+          roles: ['admin', 'manager', 'professional', 'receptionist'],
+        },
+      ],
+    },
+    {
+      label: 'Administração',
+      items: [
+        {
+          title: 'Gestão de Usuários',
+          icon: Users,
+          url: '/admin/users',
+          roles: ['admin', 'manager'],
+        },
+        {
+          title: 'Logs de Acesso',
+          icon: ShieldPlus,
+          url: '/admin/logs',
+          roles: ['admin', 'manager'],
+        },
+        {
+          title: 'Configurações Gerais',
+          icon: Settings,
+          url: '/settings',
+          roles: ['admin', 'manager'],
+        },
+        {
+          title: 'Franquia - Unidades',
+          icon: Building2,
+          url: '/admin/franchise',
+          roles: ['admin'],
+        },
+        {
+          title: 'Franquia - Dashboard',
+          icon: BarChart3,
+          url: '/franchise-dashboard',
+          roles: ['admin'],
+        },
+        {
+          title: 'Franquia - Templates',
+          icon: FileText,
+          url: '/admin/franchise/templates',
+          roles: ['admin'],
+        },
+        {
+          title: 'Franquia - Transf.',
+          icon: ArrowRightLeft,
+          url: '/admin/franchise/transfers',
+          roles: ['admin'],
+        },
+        {
+          title: 'Auditoria de Sistema',
+          icon: Activity,
+          url: '/settings/audit-history',
+          roles: ['admin'],
+        },
+        {
+          title: 'Auditoria de Assin.',
+          icon: PenLine,
+          url: '/settings/signature-audit',
+          roles: ['admin'],
+        },
+        {
+          title: 'Modelo Anatômico',
+          icon: Activity,
+          url: '/admin/anatomical-model',
+          roles: ['admin', 'manager'],
+        },
+      ],
+    },
   ]
 
-  const navItems = isPatient
-    ? patientNavItems
-    : adminNavItems.filter((item) => {
-        if (user?.role === 'admin' || user?.role === 'manager') {
-          return item.url !== '/professional/finance'
-        }
-        if (user?.role === 'professional') {
-          return [
-            dashUrl,
-            '/agenda',
-            '/pacientes',
-            '/records',
-            '/reports',
-            '/professional/finance',
-            '/manual',
-          ].includes(item.url)
-        }
-        if (user?.role === 'receptionist') {
-          return [dashUrl, '/agenda', '/pacientes', '/manual'].includes(item.url)
-        }
-        return false
-      })
+  // Filter groups and items based on role
+  const visibleGroups = allGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.roles.includes(role)),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  // Find best matching active URL for nested routes
+  const activeItemUrl = visibleGroups
+    .flatMap((g) => g.items)
+    .filter(
+      (item) => location.pathname === item.url || location.pathname.startsWith(`${item.url}/`),
+    )
+    .sort((a, b) => b.url.length - a.url.length)[0]?.url
 
   return (
     <Sidebar variant="inset" className="border-r border-border/50">
@@ -154,56 +257,17 @@ export function AppSidebar() {
           <span className="truncate text-lg tracking-tight">SpineCare</span>
         </Link>
       </SidebarHeader>
-      <SidebarContent className="px-3 gap-0">
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Principal
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive =
-                  location.pathname === item.url ||
-                  (location.pathname.startsWith(item.url) && item.url !== '/')
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                      className={`rounded-lg transition-colors mb-1 ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm font-medium'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
-                    >
-                      <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {!isPatient && (user?.role === 'admin' || user?.role === 'manager') && (
-          <SidebarGroup className="mt-6">
+      <SidebarContent className="px-3 gap-4 pb-4">
+        {visibleGroups.map((group) => (
+          <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Administração
+              {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {settingsItems.map((item) => {
-                  if (
-                    item.adminOnly &&
-                    user?.role !== 'admin' &&
-                    !(item.managerAllowed && user?.role === 'manager')
-                  )
-                    return null
-                  const isActive = location.pathname === item.url
+                {group.items.map((item) => {
+                  const isActive = activeItemUrl === item.url
+
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -227,12 +291,14 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        )}
+        ))}
       </SidebarContent>
       <SidebarFooter className="p-4">
         <div className="rounded-xl bg-muted/50 p-4 border border-border/50">
           <p className="text-xs font-semibold text-foreground mb-1">SpineCare OS</p>
-          <p className="text-[10px] text-muted-foreground">Versão 0.0.1 • Uplane Design</p>
+          <p className="text-[10px] text-muted-foreground capitalize">
+            {role === 'pending' ? 'Carregando...' : `Papel: ${role}`}
+          </p>
         </div>
       </SidebarFooter>
     </Sidebar>
