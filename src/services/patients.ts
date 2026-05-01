@@ -6,6 +6,8 @@ export interface Patient {
   document?: string
   email?: string
   phone?: string
+  dob?: string
+  clinic_id?: string
   created: string
   updated: string
 }
@@ -16,6 +18,10 @@ export const getPatients = (clinicId?: string) => {
     sort: 'name',
     filter,
   })
+}
+
+export const createPatient = (data: Partial<Patient>) => {
+  return pb.collection('patients').create<Patient>(data)
 }
 
 export const searchPatients = (query: string, clinicId?: string) => {

@@ -16,6 +16,7 @@ import Agenda from './pages/Agenda'
 import Login from './pages/Login'
 import Portal from './pages/Portal'
 import PatientPortal from './pages/PatientPortal'
+import ReceptionDashboard from './pages/ReceptionDashboard'
 import Insurance from './pages/Insurance'
 import Orders from './pages/Orders'
 import QuickUsage from './pages/QuickUsage'
@@ -52,7 +53,7 @@ const getDashUrl = (role?: string) => {
   if (role === 'admin') return '/admin/dashboard'
   if (role === 'manager') return '/manager/dashboard'
   if (role === 'professional') return '/professional/dashboard'
-  if (role === 'receptionist') return '/agenda'
+  if (role === 'receptionist') return '/reception/dashboard'
   if (role === 'patient') return '/patient-portal'
   return '/pending-role'
 }
@@ -133,6 +134,14 @@ const App = () => (
                   element={
                     <RoleGate roles={['professional']}>
                       <Index />
+                    </RoleGate>
+                  }
+                />
+                <Route
+                  path="/reception/dashboard"
+                  element={
+                    <RoleGate roles={['receptionist', 'admin', 'manager']}>
+                      <ReceptionDashboard />
                     </RoleGate>
                   }
                 />
