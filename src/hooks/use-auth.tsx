@@ -85,7 +85,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const signOut = () => {
-    pb.authStore.clear()
+    // 1. Force unmount of protected components by clearing local state first
+    setUser(null)
+
+    // 2. Wait for React to complete the unmount cycle and run cleanup functions
+    // which will unsubscribe all realtime connections gracefully before clearing auth.
+    // This prevents the SDK from sending auth updates for stale subscriptions.
+    setTimeout(() => {
+      pb.authStore.clear()
+    }, 100)
   }
 
   return (

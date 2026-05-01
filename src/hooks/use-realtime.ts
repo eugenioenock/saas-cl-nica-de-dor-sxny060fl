@@ -21,21 +21,42 @@ export function useRealtime(
 
     let unsubscribeFn: (() => Promise<void>) | undefined
     let cancelled = false
+    let retryTimeout: ReturnType<typeof setTimeout>
 
-    pb.collection(collectionName)
-      .subscribe('*', (e) => {
-        callbackRef.current(e)
-      })
-      .then((fn) => {
+    const connect = async () => {
+      if (cancelled) return
+
+      try {
+        const fn = await pb.collection(collectionName).subscribe('*', (e) => {
+          callbackRef.current(e)
+        })
         if (cancelled) {
           fn().catch(() => {})
         } else {
           unsubscribeFn = fn
         }
-      })
+      } catch (error: any) {
+        if (cancelled) return
+
+        // If there's an authorization mismatch or another error, retry gracefully
+        console.warn(
+          `Realtime subscription failed for ${collectionName}, retrying...`,
+          error?.message,
+        )
+        retryTimeout = setTimeout(connect, 2000)
+      }
+    }
+
+    // Small delay ensures auth state is fully propagated
+    // before attempting realtime subscription, preventing 403 errors
+    const initialDelay = setTimeout(() => {
+      connect()
+    }, 50)
 
     return () => {
       cancelled = true
+      clearTimeout(initialDelay)
+      clearTimeout(retryTimeout)
       if (unsubscribeFn) {
         unsubscribeFn().catch(() => {})
       }
