@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/hooks/use-auth'
 
-const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/portal' }]
+const patientNavItems = [{ title: 'Meu Portal', icon: LayoutDashboard, url: '/patient-portal' }]
 
 const settingsItems: {
   title: string
@@ -95,7 +95,8 @@ export function AppSidebar() {
     if (user?.role === 'manager') return '/manager/dashboard'
     if (user?.role === 'professional') return '/professional/dashboard'
     if (user?.role === 'receptionist') return '/agenda'
-    return '/portal'
+    if (user?.role === 'patient') return '/patient-portal'
+    return '/pending-role'
   }
 
   const dashUrl = getDashUrl()

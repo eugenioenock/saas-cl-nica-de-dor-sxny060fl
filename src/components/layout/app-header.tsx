@@ -49,7 +49,8 @@ const routeMap: Record<string, string> = {
   insurance: 'Convênios',
   reports: 'Relatórios',
   settings: 'Configurações',
-  portal: 'Meu Portal',
+  portal: 'Portal Gate',
+  'patient-portal': 'Meu Portal',
   manual: 'Manual do Sistema',
 }
 

@@ -1,4 +1,4 @@
-import { Outlet, Navigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from './layout/app-sidebar'
 import { AppHeader } from './layout/app-header'
@@ -24,12 +24,16 @@ export default function PrivateLayout() {
     return <Navigate to="/pending-approval" replace />
   }
 
+  const isPortalGate = location.pathname === '/portal'
+
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="flex flex-col min-h-screen bg-muted/30">
-        <AppHeader />
-        <main className="flex-1 p-6 animate-fade-in-up">
+      {!isPortalGate && <AppSidebar />}
+      <SidebarInset
+        className={`flex flex-col min-h-screen ${isPortalGate ? 'bg-background' : 'bg-muted/30'}`}
+      >
+        {!isPortalGate && <AppHeader />}
+        <main className={`flex-1 ${isPortalGate ? '' : 'p-6'} animate-fade-in-up`}>
           <Outlet />
         </main>
       </SidebarInset>

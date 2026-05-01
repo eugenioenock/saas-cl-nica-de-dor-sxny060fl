@@ -15,6 +15,7 @@ import RecordsRedirect from './pages/RecordsRedirect'
 import Agenda from './pages/Agenda'
 import Login from './pages/Login'
 import Portal from './pages/Portal'
+import PatientPortal from './pages/PatientPortal'
 import Insurance from './pages/Insurance'
 import Orders from './pages/Orders'
 import QuickUsage from './pages/QuickUsage'
@@ -26,6 +27,7 @@ import SettingsMaintenance from './pages/SettingsMaintenance'
 import SettingsMaintenanceMigration from './pages/SettingsMaintenanceMigration'
 import MatrixDashboard from './pages/MatrixDashboard'
 import PendingApproval from './pages/PendingApproval'
+import PendingRole from './pages/PendingRole'
 import UnitsComparison from './pages/UnitsComparison'
 import DeveloperHub from './pages/DeveloperHub'
 import AnatomicalModelEditor from './pages/AnatomicalModelEditor'
@@ -49,23 +51,36 @@ import PublicLayout from './components/PublicLayout'
 const getDashUrl = (role?: string) => {
   if (role === 'admin') return '/admin/dashboard'
   if (role === 'manager') return '/manager/dashboard'
-  if (role === 'professional') return '/agenda'
+  if (role === 'professional') return '/professional/dashboard'
   if (role === 'receptionist') return '/agenda'
-  return '/portal'
+  if (role === 'patient') return '/patient-portal'
+  return '/pending-role'
 }
 
 const RoleGate = ({ roles, children }: { roles: string[]; children: React.ReactNode }) => {
   const { user } = useAuth()
+
   if (!user) return <Navigate to="/login" replace />
+
+  if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
+    return <Navigate to="/pending-role" replace />
+  }
+
   if (!roles.includes(user.role)) {
     return <Navigate to={getDashUrl(user.role)} replace />
   }
+
   return <>{children}</>
 }
 
 const RouteDispatcher = () => {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
+
+  if (!user.role || (user.role !== 'admin' && !user.clinic_id)) {
+    return <Navigate to="/pending-role" replace />
+  }
+
   return <Navigate to={getDashUrl(user.role)} replace />
 }
 
@@ -86,6 +101,7 @@ const App = () => (
 
               <Route element={<PrivateLayout />}>
                 <Route path="/" element={<RouteDispatcher />} />
+                <Route path="/portal" element={<Portal />} />
 
                 {/* Dashboards */}
                 <Route
@@ -131,10 +147,10 @@ const App = () => (
                 />
 
                 <Route
-                  path="/portal"
+                  path="/patient-portal"
                   element={
                     <RoleGate roles={['admin', 'manager', 'patient']}>
-                      <Portal />
+                      <PatientPortal />
                     </RoleGate>
                   }
                 />
@@ -392,6 +408,7 @@ const App = () => (
               </Route>
 
               <Route path="/pending-approval" element={<PendingApproval />} />
+              <Route path="/pending-role" element={<PendingRole />} />
               <Route path="*" element={<RouteDispatcher />} />
             </Routes>
           </TooltipProvider>
